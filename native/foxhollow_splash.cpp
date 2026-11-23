@@ -21,7 +21,7 @@ extern "C" const size_t gFoxhollowSplashFontSize;
 
 namespace {
 
-constexpr Uint64 kDurationNs = 10 * SDL_NS_PER_SECOND;
+constexpr Uint64 kDurationNs = 2 * SDL_NS_PER_SECOND;
 constexpr Uint64 kFadeNs = SDL_NS_PER_SECOND / 2;
 constexpr Uint64 kFramePeriodNs = SDL_NS_PER_SECOND / 60;
 
@@ -168,7 +168,20 @@ extern "C" void fhDrawBlackScreen(void) {
   ImGui::GetForegroundDrawList()->AddRectFilled({0.f, 0.f}, ImGui::GetIO().DisplaySize, IM_COL32(0, 0, 0, 255));
 }
 
+static std::string fhSplashMarkerPath() {
+  const char* dir = std::getenv("FOXHOLLOW_CACHE_DIR");
+  if (!dir || !*dir) dir = std::getenv("FOXHOLLOW_USER_DIR");
+  if (!dir || !*dir) return {};
+  return std::string(dir) + "/shader_splash_done.ok";
+}
+
 extern "C" int fhSplashRun(void) {
+  const std::string marker = fhSplashMarkerPath();
+  bool hasMarker = false;
+  if (!marker.empty()) {
+    if (FILE* f = std::fopen(marker.c_str(), "rb")) { std::fclose(f); hasMarker = true; }
+  }
+  if (hasMarker) { return 1; }
   ImFont* font = load_font();
   if (font == nullptr) {
     return 1;
@@ -184,7 +197,8 @@ extern "C" int fhSplashRun(void) {
     if (shadersBusy && end < elapsed + kFadeNs) {
       end = elapsed + kFadeNs;
     }
-    if (!shadersBusy && elapsed >= end) {
+    if (!shadersBusy && (hasMarker || elapsed >= end)) {
+      if (!marker.empty()) { if (FILE* f = std::fopen(marker.c_str(), "wb")) { std::fwrite("1", 1, 1, f); std::fclose(f); } }
       return 1;
     }
 

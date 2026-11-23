@@ -1,68 +1,164 @@
 package dev.foxhollow.android;
-import android.app.*; import android.content.*; import android.graphics.*; import android.graphics.drawable.*;
-import android.net.*; import android.os.*; import android.util.*; import android.view.*; import android.widget.*;
+
+import android.app.*; import android.content.*; import android.content.res.Configuration;
+import android.graphics.*; import android.graphics.drawable.*; import android.net.*;
+import android.os.*; import android.util.*; import android.view.*; import android.widget.*;
 import java.io.*; import java.lang.reflect.Array; import java.util.zip.*;
+
 public class LauncherActivity extends Activity {
-  static final int REQ_ISO = 101, REQ_DRV = 102; static final String PREFS = "foxhollow_pocket_prefs_v6";
-  File baseDir; TextView isoBadge, isoTxt, drvBadge, drvTxt, progTxt; FrameLayout progBar; View progFill; Switch swDrv; Button playBtn;
-  final String[] optLabels = {"Resolution Scale","Aspect Ratio","V-Sync","Anisotropic Filtering","Graphics Backend","Language"};
-  final String[][] optItems = {{"4.0x (2160p)","3.0x (1440p)","2.5x","2.0x (1080p)","1.5x","1.0x (Native)"},{"Widescreen (16:9)","Original (4:3)"},{"On","Off"},{"16x","8x","4x","2x","1x"},{"Vulkan (Recommended)","OpenGL ES"},{"English","Francais","Deutsch","Italiano","Espanol"}};
-  final int[] optIdx = {3,0,0,0,0,0}; final TextView[] optVal = (TextView[]) Array.newInstance(TextView.class, 6);
-  final boolean[] togState = {true,true,true,false,false}; final FrameLayout[] togTrack = (FrameLayout[]) Array.newInstance(FrameLayout.class, 5); final View[] togThumb = (View[]) Array.newInstance(View.class, 5);
+  static final int REQ_ISO = 101, REQ_DRV = 102;
+  static final String PREFS = "foxhollow_pocket_prefs_v6";
+  File baseDir; TextView isoBadge, isoTxt, drvBadge, drvTxt, progTxt;
+  FrameLayout progBar; View progFill; Button playBtn;
+
+  final String[] optLabels = {"Resolution Scale", "Aspect Ratio", "V-Sync", "Anisotropic", "Backend", "Language"};
+  final String[][] optItems = {
+      {"4.0x (2160p)", "3.0x (1440p)", "2.5x", "2.0x (1080p)", "1.5x", "1.0x (Native)"},
+      {"Widescreen (16:9)", "Original (4:3)"},
+      {"On", "Off"},
+      {"16x", "8x", "4x", "2x", "1x"},
+      {"Vulkan", "OpenGL ES"},
+      {"English", "Francais", "Deutsch", "Italiano", "Espanol"}
+  };
+  final int[] optIdx = {3, 0, 0, 0, 0, 0};
+  final TextView[] optVal = (TextView[]) Array.newInstance(TextView.class, 6);
+  final boolean[] togState = {true, true, true, false, false, false};
+  final FrameLayout[] togTrack = (FrameLayout[]) Array.newInstance(FrameLayout.class, 6);
+  final View[] togThumb = (View[]) Array.newInstance(View.class, 6);
+
   int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
-  GradientDrawable pill(int t, int b, int r, int s) { GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{t, b}); d.setCornerRadius(dp(r)); if (s != 0) d.setStroke(dp(1), s); return d; }
-  File resolveStorageDir() { File p = new File(Environment.getExternalStorageDirectory(), "pocket-hollow"); if (Build.VERSION.SDK_INT < 30 || Environment.isExternalStorageManager()) { p.mkdirs(); if (p.canWrite()) return p; } File a = getExternalFilesDir(null); return a != null ? a : getFilesDir(); }
+  GradientDrawable pill(int top, int bot, int radDp, int sc) {
+    GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{top, bot});
+    d.setCornerRadius(dp(radDp)); if (sc != 0) d.setStroke(dp(1), sc); return d;
+  }
+  String detectAspectLabel(int w, int h) {
+    int big = Math.max(w, h), small = Math.max(1, Math.min(w, h)); float r = (float) big / (float) small;
+    if (r >= 2.25f) return "21:9"; if (r >= 2.08f) return "20:9"; if (r >= 1.92f) return "19.5:9";
+    if (r >= 1.70f) return "16:9"; if (r >= 1.55f) return "16:10"; if (r >= 1.42f) return "3:2"; return "4:3";
+  }
+  File resolveStorageDir() {
+    File pub = new File(Environment.getExternalStorageDirectory(), "pocket-hollow");
+    if (Build.VERSION.SDK_INT < 30 || Environment.isExternalStorageManager()) { pub.mkdirs(); if (pub.canWrite()) return pub; }
+    File appDir = getExternalFilesDir(null); return appDir != null ? appDir : getFilesDir();
+  }
   void ensureDirs() { baseDir.mkdirs(); new File(baseDir, "mods").mkdirs(); new File(baseDir, "cache").mkdirs(); }
-  void setProgPermille(int pm) { if (progBar == null || progFill == null) return; final int cl = Math.max(0, Math.min(1000, pm)); progBar.post(() -> { int tw = progBar.getWidth(); if (tw <= 0) tw = Math.max(dp(160), getResources().getDisplayMetrics().widthPixels - dp(48)); int fw = cl <= 0 ? dp(6) : Math.max(dp(8), (int)((tw * (long)cl)/1000L)); ViewGroup.LayoutParams lp = progFill.getLayoutParams(); lp.width = Math.min(tw, fw); progFill.setLayoutParams(lp); }); }
+  void setProgPermille(int pm) {
+    if (progBar == null || progFill == null) return; final int cl = Math.max(0, Math.min(1000, pm));
+    progBar.post(() -> { int tw = progBar.getWidth(); if (tw <= 0) tw = Math.max(dp(160), getResources().getDisplayMetrics().widthPixels - dp(48)); int fw = cl <= 0 ? dp(6) : Math.max(dp(8), (int)((tw * (long)cl)/1000L)); ViewGroup.LayoutParams lp = progFill.getLayoutParams(); lp.width = Math.min(tw, fw); progFill.setLayoutParams(lp); });
+  }
   @Override protected void onCreate(Bundle b) {
-    super.onCreate(b); getWindow().setStatusBarColor(0xFF0B0E14); getWindow().setNavigationBarColor(0xFF0B0E14);
+    super.onCreate(b); getWindow().setStatusBarColor(0xFF0A0D12); getWindow().setNavigationBarColor(0xFF0A0D12);
     if (Build.VERSION.SDK_INT >= 30 && !Environment.isExternalStorageManager()) {
-      new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle("Storage Access Required").setMessage("Allow \"All files access\" so Pocket-Hollow can store your saves, legal disc, and HD mods in /storage/emulated/0/pocket-hollow.").setPositiveButton("Grant Access", (d, w) -> { try { startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + getPackageName()))); } catch (Throwable ignored) {} }).setNegativeButton("Later", null).show();
+      new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle("Storage Access Required")
+        .setMessage("Allow \"All files access\" so Pocket-Hollow can store your saves, legal disc, and HD mods in /storage/emulated/0/pocket-hollow.")
+        .setPositiveButton("Grant Access", (d, w) -> { try { startActivity(new Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + getPackageName()))); } catch (Throwable ignored) {} })
+        .setNegativeButton("Later", null).show();
     }
-    baseDir = resolveStorageDir(); ensureDirs();
-    DisplayMetrics dm = getResources().getDisplayMetrics(); float wDp = dm.widthPixels / dm.density, hDp = dm.heightPixels / dm.density;
-    boolean sideBySide = wDp >= 600f, compactH = hDp < 520f; int padH = dp(wDp >= 840f ? 24 : 14), padV = dp(compactH ? 8 : 12);
-    final LinearLayout root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(0xFF0B0E14); root.setPadding(padH, padV, padH, padV);
+    baseDir = resolveStorageDir(); ensureDirs(); buildUi();
+  }
+  @Override public void onConfigurationChanged(Configuration newConfig) { super.onConfigurationChanged(newConfig); savePrefs(); buildUi(); }
+  @Override protected void onResume() { super.onResume(); File n = resolveStorageDir(); if (baseDir == null || !n.getAbsolutePath().equals(baseDir.getAbsolutePath())) { baseDir = n; ensureDirs(); } refresh(); }
+
+  void buildUi() {
+    DisplayMetrics dm = getResources().getDisplayMetrics();
+    float wDp = dm.widthPixels / dm.density, hDp = dm.heightPixels / dm.density;
+    boolean threeCol = wDp >= 680f;
+    boolean twoCol = !threeCol && wDp >= 520f;
+    boolean compactH = hDp < 500f;
+    int padH = dp(wDp >= 860f ? 20 : 12), padV = dp(compactH ? 7 : 11);
+
+    final LinearLayout root = new LinearLayout(this);
+    root.setOrientation(LinearLayout.VERTICAL); root.setBackgroundColor(0xFF0A0D12); root.setPadding(padH, padV, padH, padV);
     if (Build.VERSION.SDK_INT >= 20) {
       root.setOnApplyWindowInsetsListener((v, ins) -> {
         int l = ins.getSystemWindowInsetLeft(), t = ins.getSystemWindowInsetTop(), r = ins.getSystemWindowInsetRight(), bt = ins.getSystemWindowInsetBottom();
-        if (Build.VERSION.SDK_INT >= 28 && ins.getDisplayCutout() != null) { l = Math.max(l, ins.getDisplayCutout().getSafeInsetLeft()); t = Math.max(t, ins.getDisplayCutout().getSafeInsetTop()); r = Math.max(r, ins.getDisplayCutout().getSafeInsetRight()); bt = Math.max(bt, ins.getDisplayCutout().getSafeInsetBottom()); }
+        if (Build.VERSION.SDK_INT >= 28 && ins.getDisplayCutout() != null) {
+          l = Math.max(l, ins.getDisplayCutout().getSafeInsetLeft()); t = Math.max(t, ins.getDisplayCutout().getSafeInsetTop());
+          r = Math.max(r, ins.getDisplayCutout().getSafeInsetRight()); bt = Math.max(bt, ins.getDisplayCutout().getSafeInsetBottom());
+        }
         v.setPadding(padH + l, padV + t, padH + r, padV + bt); return ins;
       });
     }
-    LinearLayout hdr = new LinearLayout(this); hdr.setOrientation(LinearLayout.HORIZONTAL); hdr.setGravity(Gravity.CENTER_VERTICAL); hdr.setPadding(dp(2), 0, dp(2), dp(compactH ? 6 : 10));
-    TextView title = new TextView(this); title.setText("POCKET-HOLLOW"); title.setTextColor(0xFFFFFFFF); title.setTextSize(compactH ? 17f : 20f); title.setTypeface(Typeface.DEFAULT_BOLD); title.setLetterSpacing(0.05f);
-    TextView sub = new TextView(this); sub.setText("  |  ANDROID ARM64 PORT"); sub.setTextColor(0xFFFF9E44); sub.setTextSize(compactH ? 10.5f : 11.5f); sub.setTypeface(Typeface.DEFAULT_BOLD);
-    hdr.addView(title); hdr.addView(sub); root.addView(hdr, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-    ScrollView sv = new ScrollView(this); sv.setFillViewport(true); sv.setVerticalScrollBarEnabled(false);
-    LinearLayout shell = new LinearLayout(this); shell.setOrientation(LinearLayout.VERTICAL); shell.setGravity(Gravity.CENTER_HORIZONTAL);
-    LinearLayout cols = new LinearLayout(this); cols.setOrientation(sideBySide ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
-    int maxW = dp(1120); cols.setLayoutParams(new LinearLayout.LayoutParams(dm.widthPixels > maxW ? maxW : ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-    LinearLayout left = new LinearLayout(this); left.setOrientation(LinearLayout.VERTICAL); LinearLayout right = new LinearLayout(this); right.setOrientation(LinearLayout.VERTICAL);
-    if (sideBySide) { LinearLayout.LayoutParams lpL = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.46f); lpL.setMargins(0, 0, dp(10), 0); cols.addView(left, lpL); cols.addView(right, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.54f)); }
-    else { cols.addView(left, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)); cols.addView(right, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)); }
-    LinearLayout dCard = box(left, false); isoBadge = hdrBadge(dCard, "GAME DISC", "MISSING"); isoTxt = info(dCard); Button bIso = secBtn("Select Legal ISO / RVZ"); bIso.setOnClickListener(v -> promptIso()); dCard.addView(bIso);
-    LinearLayout vCard = box(left, false); drvBadge = hdrBadge(vCard, "VULKAN DRIVER", "SYSTEM"); drvTxt = info(vCard); swDrv = tog(vCard, "Use Custom Turnip / Adreno Driver");
-    Button bDrv = secBtn("Import Driver (.zip)"); bDrv.setOnClickListener(v -> { Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT); i.addCategory(Intent.CATEGORY_OPENABLE); i.setType("*/*"); startActivityForResult(i, REQ_DRV); }); vCard.addView(bDrv);
-    LinearLayout sCard = box(right, false); hdrBadge(sCard, "GRAPHICS & MODS", "OPTIMIZED");
-    LinearLayout sList = new LinearLayout(this); sList.setOrientation(LinearLayout.VERTICAL); sList.setPadding(0, dp(4), 0, 0);
-    for (int k = 0; k < 6; k++) optRow(sList, optLabels[k], k);
-    iosSwitchRow(sList, "HD Texture Pack", 0); iosSwitchRow(sList, "Water Reflections", 1); iosSwitchRow(sList, "Hold-A Auto-Mash", 2); iosSwitchRow(sList, "FPS Counter", 3); iosSwitchRow(sList, "CPU Temperature", 4);
-    sCard.addView(sList); shell.addView(cols); sv.addView(shell); root.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-    LinearLayout dock = new LinearLayout(this); dock.setOrientation(LinearLayout.VERTICAL); dock.setPadding(0, dp(compactH ? 6 : 10), 0, 0);
+
+    // Minimalist Top Bar
+    LinearLayout hdr = new LinearLayout(this); hdr.setOrientation(LinearLayout.HORIZONTAL); hdr.setGravity(Gravity.CENTER_VERTICAL); hdr.setPadding(dp(2), 0, dp(2), dp(compactH ? 6 : 9));
+    TextView title = new TextView(this); title.setText("POCKET-HOLLOW"); title.setTextColor(0xFFFFFFFF); title.setTextSize(compactH ? 16.5f : 19f); title.setTypeface(Typeface.DEFAULT_BOLD); title.setLetterSpacing(0.06f); hdr.addView(title);
+    TextView sub = new TextView(this); sub.setText("  •  ARM64"); sub.setTextColor(0xFFFF9E44); sub.setTextSize(compactH ? 10.5f : 11.5f); sub.setTypeface(Typeface.DEFAULT_BOLD); sub.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)); hdr.addView(sub);
+    TextView asp = new TextView(this); asp.setText(detectAspectLabel(dm.widthPixels, dm.heightPixels) + "  •  " + dm.widthPixels + "x" + dm.heightPixels); asp.setTextColor(0xFF94A3B8); asp.setTextSize(9.5f); asp.setTypeface(Typeface.DEFAULT_BOLD);
+    asp.setBackground(pill(0xFF131823, 0xFF131823, 8, 0xFF232B3E)); asp.setPadding(dp(9), dp(3), dp(9), dp(3)); hdr.addView(asp);
+    root.addView(hdr, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+    // Zero-Scroll 3-Column Layout on Wide Landscape (Red Magic 8 Pro 20:9, Odin 3 16:9), Adaptive Stack on 4:3 / Portrait
+    LinearLayout cols = new LinearLayout(this);
+    cols.setOrientation((threeCol || twoCol) ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+
+    LinearLayout cLeft = new LinearLayout(this); cLeft.setOrientation(LinearLayout.VERTICAL);
+    LinearLayout cMid = new LinearLayout(this); cMid.setOrientation(LinearLayout.VERTICAL);
+    LinearLayout cRight = new LinearLayout(this); cRight.setOrientation(LinearLayout.VERTICAL);
+
+    LinearLayout dCard = box(cLeft, false, compactH);
+    isoBadge = hdrBadge(dCard, "GAME DISC", "MISSING"); isoTxt = info(dCard, compactH);
+    Button bIso = secBtn("Select Legal ISO / RVZ", compactH); bIso.setOnClickListener(v -> promptIso()); dCard.addView(bIso);
+
+    LinearLayout vCard = box(cLeft, threeCol, compactH);
+    drvBadge = hdrBadge(vCard, "VULKAN DRIVER", "SYSTEM"); drvTxt = info(vCard, compactH);
+    iosSwitchRow(vCard, "Use Custom Driver", 5, compactH);
+    Button bDrv = secBtn("Import Driver (.zip)", compactH);
+    bDrv.setOnClickListener(v -> { Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT); i.addCategory(Intent.CATEGORY_OPENABLE); i.setType("*/*"); startActivityForResult(i, REQ_DRV); });
+    vCard.addView(bDrv);
+
+    LinearLayout gCard = box(cMid, threeCol, compactH);
+    hdrBadge(gCard, "DISPLAY & RENDERER", "VULKAN");
+    LinearLayout gList = new LinearLayout(this); gList.setOrientation(LinearLayout.VERTICAL); gList.setPadding(0, dp(compactH ? 2 : 4), 0, 0);
+    for (int k = 0; k < 6; k++) optRow(gList, optLabels[k], k, compactH);
+    gCard.addView(gList);
+
+    LinearLayout mCard = box(cRight, threeCol, compactH);
+    hdrBadge(mCard, "MODS & OVERLAYS", "READY");
+    LinearLayout mList = new LinearLayout(this); mList.setOrientation(LinearLayout.VERTICAL); mList.setPadding(0, dp(compactH ? 2 : 4), 0, 0);
+    iosSwitchRow(mList, "HD Texture Pack", 0, compactH);
+    iosSwitchRow(mList, "Water Reflections", 1, compactH);
+    iosSwitchRow(mList, "Hold-A Auto-Mash", 2, compactH);
+    iosSwitchRow(mList, "FPS Counter", 3, compactH);
+    iosSwitchRow(mList, "CPU Temperature", 4, compactH);
+    mCard.addView(mList);
+
+    if (threeCol) {
+      LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.31f); lp1.setMargins(0, 0, dp(8), 0);
+      LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.37f); lp2.setMargins(0, 0, dp(8), 0);
+      LinearLayout.LayoutParams lp3 = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 0.32f);
+      cols.addView(cLeft, lp1); cols.addView(cMid, lp2); cols.addView(cRight, lp3);
+      root.addView(cols, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+    } else {
+      ScrollView sv = new ScrollView(this); sv.setFillViewport(true); sv.setVerticalScrollBarEnabled(false);
+      if (twoCol) {
+        LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.45f); lp1.setMargins(0, 0, dp(8), 0);
+        LinearLayout rightWrap = new LinearLayout(this); rightWrap.setOrientation(LinearLayout.VERTICAL);
+        rightWrap.addView(cMid); rightWrap.addView(cRight);
+        cols.addView(cLeft, lp1); cols.addView(rightWrap, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.55f));
+      } else {
+        cols.addView(cLeft); cols.addView(cMid); cols.addView(cRight);
+      }
+      sv.addView(cols);
+      root.addView(sv, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+    }
+
+    // Pinned Bottom Action Dock
+    LinearLayout dock = new LinearLayout(this); dock.setOrientation(LinearLayout.VERTICAL); dock.setPadding(0, dp(compactH ? 6 : 9), 0, 0);
     progBar = new FrameLayout(this); progBar.setBackground(pill(0xFF1A202E, 0xFF1A202E, 5, 0xFF2E374D));
-    LinearLayout.LayoutParams lpProg = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(8)); lpProg.setMargins(0, 0, 0, dp(4)); progBar.setLayoutParams(lpProg);
-    progFill = new View(this); progFill.setBackground(pill(0xFFFF8C38, 0xFFDC4C00, 5, 0)); progFill.setLayoutParams(new FrameLayout.LayoutParams(dp(6), ViewGroup.LayoutParams.MATCH_PARENT));
+    LinearLayout.LayoutParams lpProg = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(7)); lpProg.setMargins(0, 0, 0, dp(4)); progBar.setLayoutParams(lpProg);
+    progFill = new View(this); progFill.setBackground(pill(0xFFFF8C38, 0xFFE05200, 5, 0)); progFill.setLayoutParams(new FrameLayout.LayoutParams(dp(6), ViewGroup.LayoutParams.MATCH_PARENT));
     progBar.addView(progFill); progBar.setVisibility(View.GONE);
-    progTxt = new TextView(this); progTxt.setTextColor(0xFFFFB74D); progTxt.setTextSize(11.5f); progTxt.setVisibility(View.GONE); progTxt.setPadding(0, 0, 0, dp(4));
+    progTxt = new TextView(this); progTxt.setTextColor(0xFFFFB74D); progTxt.setTextSize(11f); progTxt.setVisibility(View.GONE); progTxt.setPadding(0, 0, 0, dp(3));
     dock.addView(progBar); dock.addView(progTxt);
-    playBtn = new Button(this); playBtn.setText("PLAY GAME"); playBtn.setTextColor(0xFFFFFFFF); playBtn.setTextSize(compactH ? 14f : 15f); playBtn.setTypeface(Typeface.DEFAULT_BOLD); playBtn.setLetterSpacing(0.08f);
-    playBtn.setBackground(pill(0xFFFF8C38, 0xFFDC4C00, 12, 0)); playBtn.setPadding(dp(16), dp(compactH ? 10 : 13), dp(16), dp(compactH ? 10 : 13)); playBtn.setOnClickListener(v -> launch());
+
+    playBtn = new Button(this); playBtn.setText("PLAY GAME"); playBtn.setTextColor(0xFFFFFFFF); playBtn.setTextSize(compactH ? 13.5f : 15f); playBtn.setTypeface(Typeface.DEFAULT_BOLD); playBtn.setLetterSpacing(0.08f);
+    playBtn.setBackground(pill(0xFFFF8C38, 0xFFE05200, 11, 0)); playBtn.setPadding(dp(16), dp(compactH ? 9 : 12), dp(16), dp(compactH ? 9 : 12)); playBtn.setOnClickListener(v -> launch());
     dock.addView(playBtn, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
     root.addView(dock, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
     setContentView(root); loadPrefs(); refresh();
   }
-  @Override protected void onResume() { super.onResume(); File n = resolveStorageDir(); if (baseDir == null || !n.getAbsolutePath().equals(baseDir.getAbsolutePath())) { baseDir = n; ensureDirs(); } refresh(); }
   void promptIso() { Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT); i.addCategory(Intent.CATEGORY_OPENABLE); i.setType("*/*"); startActivityForResult(i, REQ_ISO); }
   void extractAssetZip(String a, File d, String l) throws Exception {
     File mk = new File(d, ".ok_v3"); if (mk.exists()) return;
@@ -118,16 +214,16 @@ public class LauncherActivity extends Activity {
         File icd = new File(dir, "vk_icd.json");
         if (!icd.exists()) { org.json.JSONObject o = new org.json.JSONObject().put("library_path", new File(dir, so).getAbsolutePath()).put("api_version", "1.3.0"); String j = new org.json.JSONObject().put("file_format_version", "1.0.0").put("ICD", o).toString(); try (FileOutputStream fos = new FileOutputStream(icd)) { fos.write(j.getBytes("UTF-8")); } }
         final String fSo = so; getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("driver_name", fSo).putBoolean("drv", true).apply();
-        runOnUiThread(() -> { busy(false, ""); swDrv.setChecked(true); refresh(); Toast.makeText(this, "Driver installed: " + fSo, Toast.LENGTH_SHORT).show(); });
+        runOnUiThread(() -> { busy(false, ""); setIosSwitchVisual(5, true, false); savePrefs(); refresh(); Toast.makeText(this, "Driver installed: " + fSo, Toast.LENGTH_SHORT).show(); });
       } catch (Exception e) { runOnUiThread(() -> { busy(false, ""); err("Driver Import Failed", String.valueOf(e.getMessage())); }); }
     }).start();
   }
   void refresh() {
     File iso = new File(baseDir, "game.iso");
-    if (iso.exists() && iso.length() > 1048576L) { isoBadge.setText("READY"); isoBadge.setTextColor(0xFF34D399); isoBadge.setBackground(pill(0xFF064E3B, 0xFF064E3B, 6, 0)); isoTxt.setText("game.iso  (" + (iso.length() / 1048576L) + " MB)  |  Verified"); }
+    if (iso.exists() && iso.length() > 1048576L) { isoBadge.setText("READY"); isoBadge.setTextColor(0xFF34D399); isoBadge.setBackground(pill(0xFF064E3B, 0xFF064E3B, 6, 0)); isoTxt.setText("game.iso  (" + (iso.length() / 1048576L) + " MB)  •  Verified"); }
     else { isoBadge.setText("MISSING"); isoBadge.setTextColor(0xFFFBBF24); isoBadge.setBackground(pill(0xFF451A03, 0xFF451A03, 6, 0)); isoTxt.setText("No legal disc imported yet."); }
-    drvBadge.setText(swDrv.isChecked() ? "CUSTOM" : "SYSTEM"); drvBadge.setTextColor(swDrv.isChecked() ? 0xFF60A5FA : 0xFF9CA3AF); drvBadge.setBackground(pill(0xFF1E293B, 0xFF1E293B, 6, 0));
-    drvTxt.setText(getSharedPreferences(PREFS, MODE_PRIVATE).getString("driver_name", "System Adreno Vulkan"));
+    drvBadge.setText(Array.getBoolean(togState, 5) ? "CUSTOM" : "SYSTEM"); drvBadge.setTextColor(Array.getBoolean(togState, 5) ? 0xFF60A5FA : 0xFF9CA3AF); drvBadge.setBackground(pill(0xFF1E293B, 0xFF1E293B, 6, 0));
+    drvTxt.setText(Array.getBoolean(togState, 5) ? getSharedPreferences(PREFS, MODE_PRIVATE).getString("driver_name", "Custom Turnip / Adreno") : "System Default Vulkan");
   }
   void launch() {
     File chkIso = new File(baseDir, "game.iso"); if (!chkIso.exists() || chkIso.length() < 1048576L) { promptIso(); return; }
@@ -152,23 +248,23 @@ public class LauncherActivity extends Activity {
         i.putExtra("FOXHOLLOW_ANISO", (String) Array.get(an, Array.getInt(optIdx, 3))); i.putExtra("FOXHOLLOW_RENDERER", Array.getInt(optIdx, 4) == 0 ? "vulkan" : "opengles");
         i.putExtra("FOXHOLLOW_LANGUAGE", (String) Array.get(lg, Array.getInt(optIdx, 5))); i.putExtra("FOXHOLLOW_DEBUG", "0");
         File icd = new File(new File(getCodeCacheDir(), "custom_driver"), "vk_icd.json");
-        if (swDrv.isChecked() && icd.exists()) { i.putExtra("CUSTOM_VK_ICD", icd.getAbsolutePath()); i.putExtra("CUSTOM_VK_DIR", icd.getParentFile().getAbsolutePath()); }
+        if (Array.getBoolean(togState, 5) && icd.exists()) { i.putExtra("CUSTOM_VK_ICD", icd.getAbsolutePath()); i.putExtra("CUSTOM_VK_DIR", icd.getParentFile().getAbsolutePath()); }
         startActivity(i);
       });
     }).start();
   }
-  void setIosSwitchVisual(int idx, boolean on, boolean anim) { Array.setBoolean(togState, idx, on); FrameLayout tr = (FrameLayout) Array.get(togTrack, idx); View th = (View) Array.get(togThumb, idx); tr.setBackground(on ? pill(0xFF34C759, 0xFF30D158, 15, 0) : pill(0xFF282F40, 0xFF282F40, 15, 0xFF3A445C)); float tx = on ? dp(22) : 0f; if (anim) th.animate().translationX(tx).setDuration(150).start(); else th.setTranslationX(tx); }
-  void iosSwitchRow(LinearLayout p, String l, final int idx) { LinearLayout r = new LinearLayout(this); r.setOrientation(LinearLayout.HORIZONTAL); r.setGravity(Gravity.CENTER_VERTICAL); r.setPadding(0, dp(6), 0, dp(6)); TextView v = new TextView(this); v.setText(l); v.setTextColor(0xFFE5E7EB); v.setTextSize(13f); v.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)); FrameLayout track = new FrameLayout(this); track.setLayoutParams(new LinearLayout.LayoutParams(dp(50), dp(28))); track.setPadding(dp(3), dp(3), dp(3), dp(3)); View thumb = new View(this); thumb.setLayoutParams(new FrameLayout.LayoutParams(dp(22), dp(22))); thumb.setBackground(pill(0xFFFFFFFF, 0xFFF3F4F6, 11, 0)); thumb.setElevation(dp(3)); track.addView(thumb); Array.set(togTrack, idx, track); Array.set(togThumb, idx, thumb); View.OnClickListener flip = w -> setIosSwitchVisual(idx, !Array.getBoolean(togState, idx), true); r.setOnClickListener(flip); track.setOnClickListener(flip); r.addView(v); r.addView(track); p.addView(r); }
-  void savePrefs() { SharedPreferences.Editor e = getSharedPreferences(PREFS, MODE_PRIVATE).edit(); for (int k = 0; k < 6; k++) e.putInt("o" + k, Array.getInt(optIdx, k)); for (int t = 0; t < 5; t++) e.putBoolean("t" + t, Array.getBoolean(togState, t)); e.putBoolean("drv", swDrv.isChecked()).apply(); }
-  void loadPrefs() { SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE); int[] def = {3, 0, 0, 0, 0, 0}; for (int k = 0; k < 6; k++) { int v = p.getInt("o" + k, Array.getInt(def, k)); Array.setInt(optIdx, k, v); String[] row = (String[]) Array.get(optItems, k); ((TextView) Array.get(optVal, k)).setText(((String) Array.get(row, v)) + "  v"); } boolean[] tdef = {true, true, true, false, false}; for (int t = 0; t < 5; t++) setIosSwitchVisual(t, p.getBoolean("t" + t, Array.getBoolean(tdef, t)), false); swDrv.setChecked(p.getBoolean("drv", false)); }
+  void setIosSwitchVisual(int idx, boolean on, boolean anim) { Array.setBoolean(togState, idx, on); FrameLayout tr = (FrameLayout) Array.get(togTrack, idx); View th = (View) Array.get(togThumb, idx); tr.setBackground(on ? pill(0xFF34C759, 0xFF30D158, 13, 0) : pill(0xFF282F40, 0xFF282F40, 13, 0xFF3A445C)); float tx = on ? dp(18) : 0f; if (anim) th.animate().translationX(tx).setDuration(140).start(); else th.setTranslationX(tx); if (idx == 5 && drvBadge != null) { savePrefs(); refresh(); } }
+  void iosSwitchRow(LinearLayout p, String l, final int idx, boolean c) { LinearLayout r = new LinearLayout(this); r.setOrientation(LinearLayout.HORIZONTAL); r.setGravity(Gravity.CENTER_VERTICAL); r.setPadding(0, dp(c ? 3 : 5), 0, dp(c ? 3 : 5)); TextView v = new TextView(this); v.setText(l); v.setTextColor(0xFFE5E7EB); v.setTextSize(c ? 11.5f : 12.5f); v.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)); FrameLayout track = new FrameLayout(this); track.setLayoutParams(new LinearLayout.LayoutParams(dp(42), dp(24))); track.setPadding(dp(3), dp(3), dp(3), dp(3)); View thumb = new View(this); thumb.setLayoutParams(new FrameLayout.LayoutParams(dp(18), dp(18))); thumb.setBackground(pill(0xFFFFFFFF, 0xFFF3F4F6, 9, 0)); thumb.setElevation(dp(2)); track.addView(thumb); Array.set(togTrack, idx, track); Array.set(togThumb, idx, thumb); View.OnClickListener flip = w -> setIosSwitchVisual(idx, !Array.getBoolean(togState, idx), true); r.setOnClickListener(flip); track.setOnClickListener(flip); r.addView(v); r.addView(track); p.addView(r); }
+  void savePrefs() { SharedPreferences.Editor e = getSharedPreferences(PREFS, MODE_PRIVATE).edit(); for (int k = 0; k < 6; k++) e.putInt("o" + k, Array.getInt(optIdx, k)); for (int t = 0; t < 6; t++) e.putBoolean("t" + t, Array.getBoolean(togState, t)); e.putBoolean("drv", Array.getBoolean(togState, 5)).apply(); }
+  void loadPrefs() { SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE); int[] def = {3, 0, 0, 0, 0, 0}; for (int k = 0; k < 6; k++) { int v = p.getInt("o" + k, Array.getInt(def, k)); Array.setInt(optIdx, k, v); String[] row = (String[]) Array.get(optItems, k); ((TextView) Array.get(optVal, k)).setText(((String) Array.get(row, v)) + " ▾"); } boolean[] tdef = {true, true, true, false, false, false}; for (int t = 0; t < 6; t++) setIosSwitchVisual(t, p.getBoolean("t" + t, Array.getBoolean(tdef, t)), false);  }
   void busy(boolean b, String m) { progBar.setVisibility(b ? View.VISIBLE : View.GONE); progTxt.setVisibility(b ? View.VISIBLE : View.GONE); progTxt.setText(m); }
   void err(String t, String m) { new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle(t).setMessage(m).setPositiveButton("OK", null).show(); }
   void del(File f) { if (f.isDirectory()) { File[] c = f.listFiles(); if (c != null) for (File x : c) del(x); } f.delete(); }
-  LinearLayout box(LinearLayout p, boolean fill) { LinearLayout c = new LinearLayout(this); c.setOrientation(LinearLayout.VERTICAL); c.setBackground(pill(0xFF161B26, 0xFF161B26, 16, 0xFF252C3D)); c.setPadding(dp(16), dp(14), dp(16), dp(14)); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, fill ? ViewGroup.LayoutParams.MATCH_PARENT : ViewGroup.LayoutParams.WRAP_CONTENT); if (!fill) lp.setMargins(0, 0, 0, dp(10)); c.setLayoutParams(lp); p.addView(c); return c; }
-  TextView hdrBadge(LinearLayout p, String title, String badge) { LinearLayout r = new LinearLayout(this); r.setOrientation(LinearLayout.HORIZONTAL); r.setGravity(Gravity.CENTER_VERTICAL); p.addView(r); TextView tv = new TextView(this); tv.setText(title); tv.setTextColor(0xFFF3F4F6); tv.setTextSize(11.5f); tv.setTypeface(Typeface.DEFAULT_BOLD); tv.setLetterSpacing(0.06f); tv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)); r.addView(tv); TextView bg = new TextView(this); bg.setText(badge); bg.setTextColor(0xFFFF9E44); bg.setTextSize(9.5f); bg.setTypeface(Typeface.DEFAULT_BOLD); bg.setBackground(pill(0xFF2A1D12, 0xFF2A1D12, 6, 0)); bg.setPadding(dp(7), dp(2), dp(7), dp(2)); r.addView(bg); return bg; }
-  TextView info(LinearLayout p) { TextView v = new TextView(this); v.setTextColor(0xFF9CA3AF); v.setTextSize(12f); v.setPadding(0, dp(6), 0, dp(8)); p.addView(v); return v; }
-  Button secBtn(String l) { Button b = new Button(this); b.setText(l); b.setTextColor(0xFFE5E7EB); b.setTextSize(12f); b.setTypeface(Typeface.DEFAULT_BOLD); b.setAllCaps(false); b.setBackground(pill(0xFF212838, 0xFF212838, 10, 0xFF333D54)); b.setPadding(dp(12), dp(9), dp(12), dp(9)); return b; }
-  Switch tog(LinearLayout p, String l) { Switch s = new Switch(this); s.setText(l); s.setTextColor(0xFFE5E7EB); s.setTextSize(12.5f); s.setPadding(0, dp(6), 0, dp(6)); p.addView(s); return s; }
-  void showDropdown(final TextView anchor, final int k) { LinearLayout menu = new LinearLayout(this); menu.setOrientation(LinearLayout.VERTICAL); menu.setBackground(pill(0xFF1A202E, 0xFF161B26, 12, 0xFF3A445E)); menu.setPadding(dp(6), dp(6), dp(6), dp(6)); final PopupWindow pop = new PopupWindow(menu, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true); pop.setElevation(dp(14)); String[] row = (String[]) Array.get(optItems, k); for (int j = 0; j < row.length; j++) { final int idx = j; TextView item = new TextView(this); String lbl = (String) Array.get(row, j); item.setText(lbl); boolean sel = (idx == Array.getInt(optIdx, k)); item.setTextColor(sel ? 0xFFFF9E44 : 0xFFE5E7EB); item.setTypeface(sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT); item.setTextSize(12.5f); item.setPadding(dp(16), dp(9), dp(20), dp(9)); if (sel) item.setBackground(pill(0xFF262E42, 0xFF262E42, 8, 0)); item.setOnClickListener(v -> { Array.setInt(optIdx, k, idx); anchor.setText(lbl + "  v"); pop.dismiss(); }); menu.addView(item); } pop.showAsDropDown(anchor, 0, dp(4)); }
-  void optRow(LinearLayout p, String l, final int k) { LinearLayout r = new LinearLayout(this); r.setOrientation(LinearLayout.HORIZONTAL); r.setGravity(Gravity.CENTER_VERTICAL); r.setPadding(0, dp(6), 0, dp(6)); TextView v = new TextView(this); v.setText(l); v.setTextColor(0xFFE5E7EB); v.setTextSize(13f); v.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)); TextView pillBtn = new TextView(this); pillBtn.setTextColor(0xFFFF9E44); pillBtn.setTextSize(12.5f); pillBtn.setTypeface(Typeface.DEFAULT_BOLD); pillBtn.setBackground(pill(0xFF212838, 0xFF212838, 9, 0xFF333D54)); pillBtn.setPadding(dp(14), dp(8), dp(14), dp(8)); pillBtn.setOnClickListener(w -> showDropdown(pillBtn, k)); Array.set(optVal, k, pillBtn); r.addView(v); r.addView(pillBtn); p.addView(r); }
+  LinearLayout box(LinearLayout p, boolean fill, boolean c) { LinearLayout b = new LinearLayout(this); b.setOrientation(LinearLayout.VERTICAL); b.setBackground(pill(0xFF131823, 0xFF131823, 14, 0xFF232B3E)); b.setPadding(dp(c ? 12 : 15), dp(c ? 10 : 13), dp(c ? 12 : 15), dp(c ? 10 : 13)); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, fill ? 0 : ViewGroup.LayoutParams.WRAP_CONTENT, fill ? 1f : 0f); if (!fill) lp.setMargins(0, 0, 0, dp(c ? 7 : 9)); b.setLayoutParams(lp); p.addView(b); return b; }
+  TextView hdrBadge(LinearLayout p, String title, String badge) { LinearLayout r = new LinearLayout(this); r.setOrientation(LinearLayout.HORIZONTAL); r.setGravity(Gravity.CENTER_VERTICAL); p.addView(r); TextView tv = new TextView(this); tv.setText(title); tv.setTextColor(0xFFF3F4F6); tv.setTextSize(11f); tv.setTypeface(Typeface.DEFAULT_BOLD); tv.setLetterSpacing(0.06f); tv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)); r.addView(tv); TextView bg = new TextView(this); bg.setText(badge); bg.setTextColor(0xFFFF9E44); bg.setTextSize(9f); bg.setTypeface(Typeface.DEFAULT_BOLD); bg.setBackground(pill(0xFF2A1D12, 0xFF2A1D12, 6, 0)); bg.setPadding(dp(6), dp(2), dp(6), dp(2)); r.addView(bg); return bg; }
+  TextView info(LinearLayout p, boolean c) { TextView v = new TextView(this); v.setTextColor(0xFF9CA3AF); v.setTextSize(c ? 11f : 12f); v.setPadding(0, dp(c ? 4 : 6), 0, dp(c ? 5 : 7)); p.addView(v); return v; }
+  Button secBtn(String l, boolean c) { Button b = new Button(this); b.setText(l); b.setTextColor(0xFFE5E7EB); b.setTextSize(c ? 11.5f : 12f); b.setTypeface(Typeface.DEFAULT_BOLD); b.setAllCaps(false); b.setBackground(pill(0xFF1C2333, 0xFF1C2333, 9, 0xFF333D54)); b.setPadding(dp(10), dp(c ? 6 : 8), dp(10), dp(c ? 6 : 8)); return b; }
+  Switch tog(LinearLayout p, String l, boolean c) { Switch s = new Switch(this); s.setText(l); s.setTextColor(0xFFE5E7EB); s.setTextSize(c ? 11.5f : 12.5f); s.setPadding(0, dp(c ? 3 : 5), 0, dp(c ? 3 : 5)); p.addView(s); return s; }
+  void showDropdown(final TextView anchor, final int k) { LinearLayout menu = new LinearLayout(this); menu.setOrientation(LinearLayout.VERTICAL); menu.setBackground(pill(0xFF1A202E, 0xFF131823, 12, 0xFF3A445E)); menu.setPadding(dp(6), dp(6), dp(6), dp(6)); final PopupWindow pop = new PopupWindow(menu, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true); pop.setElevation(dp(14)); String[] row = (String[]) Array.get(optItems, k); for (int j = 0; j < row.length; j++) { final int idx = j; TextView item = new TextView(this); String lbl = (String) Array.get(row, j); item.setText(lbl); boolean sel = (idx == Array.getInt(optIdx, k)); item.setTextColor(sel ? 0xFFFF9E44 : 0xFFE5E7EB); item.setTypeface(sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT); item.setTextSize(12f); item.setPadding(dp(14), dp(8), dp(18), dp(8)); if (sel) item.setBackground(pill(0xFF262E42, 0xFF262E42, 8, 0)); item.setOnClickListener(v -> { Array.setInt(optIdx, k, idx); anchor.setText(lbl + " ▾"); pop.dismiss(); }); menu.addView(item); } pop.showAsDropDown(anchor, 0, dp(4)); }
+  void optRow(LinearLayout p, String l, final int k, boolean c) { LinearLayout r = new LinearLayout(this); r.setOrientation(LinearLayout.HORIZONTAL); r.setGravity(Gravity.CENTER_VERTICAL); r.setPadding(0, dp(c ? 2 : 4), 0, dp(c ? 2 : 4)); TextView v = new TextView(this); v.setText(l); v.setTextColor(0xFFE5E7EB); v.setTextSize(c ? 11.5f : 12.5f); v.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)); TextView pillBtn = new TextView(this); pillBtn.setTextColor(0xFFFF9E44); pillBtn.setTextSize(c ? 11f : 12f); pillBtn.setTypeface(Typeface.DEFAULT_BOLD); pillBtn.setBackground(pill(0xFF1C2333, 0xFF1C2333, 8, 0xFF333D54)); pillBtn.setPadding(dp(c ? 9 : 12), dp(c ? 5 : 7), dp(c ? 9 : 12), dp(c ? 5 : 7)); pillBtn.setOnClickListener(w -> showDropdown(pillBtn, k)); Array.set(optVal, k, pillBtn); r.addView(v); r.addView(pillBtn); p.addView(r); }
 }

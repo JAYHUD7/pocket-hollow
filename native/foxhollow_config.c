@@ -147,7 +147,7 @@ static void load(void) {
 
 FhScreenStyle fhConfigScreenStyle(void) {
   load();
-  return FH_SCREEN_STYLE_WIDE;
+  return sScreenStyle;
 }
 
 int fhConfigScreenStyleIsForced(void) { return fhConfigScreenStyle() != FH_SCREEN_STYLE_AUTO; }

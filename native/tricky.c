@@ -2756,7 +2756,7 @@ int trickyShouldGoToWarpPoint(GameObject* tricky, TrickyState* state) {
         }
     }
 
-    if (result == 1) {
+    if (result == 1 && st->commandCount == 0) {
         GameObject* playerObj = state->playerObj;
 
         if (vec3f_distanceSquared(&playerObj->anim.worldPosX, &tricky->anim.worldPosX) < 2500.0f) {
@@ -6567,7 +6567,7 @@ void sideCommandEnable(GameObject* obj, GameObject* targetObj, int commandKind, 
     count = state->commandCount;
     for (remaining = count; remaining > 0; remaining--) {
         if (*(GameObject**)(commandEntry + offsetof(TrickyState, commands)) == targetObj) {
-            state->commands[commandIndex].ttl = 8;
+            state->commands[commandIndex].ttl = 3;
             return;
         }
         commandEntry += sizeof(TrickyCommand);
@@ -6576,7 +6576,7 @@ void sideCommandEnable(GameObject* obj, GameObject* targetObj, int commandKind, 
     state->commands[count].targetObj = targetObj;
     state->commands[state->commandCount].kind = commandKind;
     state->commands[state->commandCount].type = commandType;
-    state->commands[state->commandCount].ttl = 8;
+    state->commands[state->commandCount].ttl = 3;
     state->commandCount++;
 }
 
@@ -6613,10 +6613,11 @@ int Tricky_updateSideCommandPrompts(GameObject* obj) {
     promptTable[0] = *(u32*)lbl_803E23C8;
     bitVal = mainGetBit(GAMEBIT_Tricky_Usable);
     if (bitVal != 0) {
-        if ((state->stateFlags & 0x10) != 0) {
+        if (((state->stateFlags & 0x10) != 0) && (state->commandCount == 0)) {
             state->commandRequestBits = 0;
         }
         commandMask = state->commandRequestBits | 9;
+        for (i = 0; i < state->commandCount; i++) { commandMask |= (1 << state->commands[i].type); }
         if (((state->stateIndex == 8) || (state->stateIndex == 0xd)) ||
             ((state->stateIndex == 0xe && (state->substate == 1)))) {
             commandMask |= 0x10;
@@ -6848,7 +6849,7 @@ void Tricky_render(GameObject* obj, int p2, int p3, int p4, int p5, char doRende
                                       0);
         pathInfo = objFindJointPoseVector(obj, 0);
         pathState->modelAnchorRotY = pathInfo[1];
-        if ((state->stateFlags & 0x10) != 0) {
+        if (((state->stateFlags & 0x10) != 0) && (state->commandCount == 0)) {
             switch (state->stateIndex) {
             case 2:
                 skeetla_spawnLinkedSparks(obj);
@@ -7139,7 +7140,7 @@ void Tricky_update(GameObject* obj) {
                 break;
             }
         }
-        if ((trickyState->stateFlags & 0x10) == 0 &&
+        if ((trickyState->stateFlags & 0x10) == 0 && trickyState->commandCount == 0 && cmd == -1 &&
             trickyShouldGoToWarpPoint((GameObject*)obj, (TrickyState*)state) == 2) {
             trickyState->stateIndex = 0x11;
         } else if (trickyState->stateIndex == 8 && cmd == 4) {

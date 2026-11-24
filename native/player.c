@@ -9879,7 +9879,7 @@ int playerCheckIfClimbingOntoWall(GameObject* obj, PlayerState* state, PlayerSta
             return 0xd;
         case 3:
         case 4:
-            if (state->baddie.animSpeedA >= 1.18f && state2->baddie.inputMagnitude >= 0.80f) {
+            if ((coordsToMapCell(obj->anim.localPosX, obj->anim.localPosZ) == 0xb && (*gMapEventInterface)->getMapAct(0xb) == 7) && state->baddie.animSpeedA >= 1.18f && state2->baddie.inputMagnitude >= 0.80f) {
                 continue;
             }
             if (!(hd <= 15.0f)) {
@@ -10194,9 +10194,10 @@ int playerBuildWallTransitionProbe(GameObject* obj, TrackBBoxHit* hit, PlayerSta
     inner = obj->extra;
     if (fa <= inner->baddie.animSpeedA * fb || fa <= 3.5f) {
         s8 st = hit->surfaceType;
-        if ((st == 2 || st == 0x11) && inner->baddie.animSpeedA < 1.18f) {
+        f32 sprintThresh = (coordsToMapCell(obj->anim.localPosX, obj->anim.localPosZ) == 0xb && (*gMapEventInterface)->getMapAct(0xb) == 7) ? 1.18f : 999.0f;
+        if ((st == 2 || st == 0x11) && inner->baddie.animSpeedA < sprintThresh) {
             mode = 4;
-        } else if (inner->baddie.animSpeedA >= 1.18f) {
+        } else if (inner->baddie.animSpeedA >= sprintThresh) {
             mode = 5;
         } else if (st != 4) {
             mode = 4;

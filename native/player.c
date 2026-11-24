@@ -1,4 +1,3 @@
-extern int fh_hold_a_active(void);
 #define BADDIE_MOVE_STATUS_SIGNED
 
 #include "main/dll/player.h"
@@ -3447,7 +3446,8 @@ int playerStateStaffLiftRock(GameObject* obj, PlayerState* state, f32 fv) {
     case 0xb1: {
         setAButtonIcon(2);
         staffactivated_setLiftHeight(gPlayerInteractTarget, 0);
-        if ((inner->buttonsJustPressed & 0x100) != 0) {
+        { extern u8 gFhForceAutoMashA; gFhForceAutoMashA = 1; }
+        if (((inner->buttonsJustPressed | getButtonsJustPressed(0)) & 0x100) != 0) {
             buttonDisable(0, PAD_BUTTON_A);
             gPlayerLiftRockPullAccum = 10.0f;
             ObjAnim_SetCurrentMove(obj, 0xac, 0.0f, 0);
@@ -3472,7 +3472,8 @@ int playerStateStaffLiftRock(GameObject* obj, PlayerState* state, f32 fv) {
         f32 prog;
         setAButtonIcon(2);
         gPlayerLiftRockPullAccum -= 1.0f;
-        if (((inner->buttonsJustPressedIfNotBusy & PAD_BUTTON_A) != 0) || (fh_hold_a_active() && (inner->buttonsHeld & PAD_BUTTON_A) != 0) || getCurSeqNo() != 0) {
+        { extern u8 gFhForceAutoMashA; gFhForceAutoMashA = 1; }
+        if (((inner->buttonsJustPressedIfNotBusy | getButtonsJustPressedIfNotBusy(0)) & PAD_BUTTON_A) != 0 || getCurSeqNo() != 0) {
             buttonDisable(0, PAD_BUTTON_A);
             gPlayerStaffSfxTimer = gPlayerStaffSfxTimer - fv;
             if (gPlayerStaffSfxTimer < 0.0f) {
@@ -10195,7 +10196,7 @@ int playerBuildWallTransitionProbe(GameObject* obj, TrackBBoxHit* hit, PlayerSta
         s8 st = hit->surfaceType;
         if ((st == 2 || st == 0x11) && inner->baddie.animSpeedA < 1.18f) {
             mode = 4;
-        } else if (inner->baddie.animSpeedA >= 1.2530199f) {
+        } else if (inner->baddie.animSpeedA >= 1.18f) {
             mode = 5;
         } else if (st != 4) {
             mode = 4;

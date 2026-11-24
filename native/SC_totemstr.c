@@ -1,4 +1,3 @@
-extern int fh_hold_a_active(void);
 #include "dlls/objects/444_SC_totemstr.h"
 
 #include "dlls/objects/438_SC_levelcon.h"
@@ -237,7 +236,8 @@ static int sc_totemstrength_animEventCallback(GameObject* obj, int unused, ObjSe
             distanceFromCenter = -distanceFromCenter;
         }
         push = (1.7f * normalizedOffset + 0.2f) * distanceFromCenter + 1.0f;
-        if ((((getButtonsJustPressedIfNotBusy(0) & PAD_BUTTON_A) != 0) || (fh_hold_a_active() && (getButtonsHeld(0) & PAD_BUTTON_A) != 0)) && isGameTimerDisabled() == 0) {
+        { extern u8 gFhForceAutoMashA; gFhForceAutoMashA = 1; }
+        if ((getButtonsJustPressedIfNotBusy(0) & PAD_BUTTON_A) != 0 && isGameTimerDisabled() == 0) {
             state->trackVelocity -= 2.7f;
         }
         if (state->trackVelocity < -40.0f) {

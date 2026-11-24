@@ -463,9 +463,7 @@ extern "C" void fhDebugOverlayDraw(void) {
     }
     sToggleKeyWasDown = toggleKeyDown;
 
-    if (!sVisible) {
-        return;
-    }
+    return;
 
     const float displayedWorstFrameMs = sDisplayedWorstFrameMs != 0.0f ? sDisplayedWorstFrameMs : sWorstFrameMs;
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |

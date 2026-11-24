@@ -1,4 +1,3 @@
-extern int fh_hold_a_active(void);
 /*
  * DBSH_Symbol (DLL 0x196) - Dark Ice Mines shrine spinning symbol.
  *
@@ -109,8 +108,9 @@ static int dbshSymbol_processAnimEvents(GameObject* obj, int unused, ObjSeqState
             state->flags |= DBSH_SYMBOL_SEQUENCE_INACTIVE;
             (*gObjectTriggerInterface)->yield(animUpdate, 0xBD);
         }
+        { extern u8 gFhForceAutoMashA; gFhForceAutoMashA = 1; }
         buttons = getButtonsJustPressedIfNotBusy(0);
-        if (((buttons & PAD_BUTTON_A) != 0) || (fh_hold_a_active() && (getButtonsHeld(0) & PAD_BUTTON_A) != 0)) {
+        if ((buttons & PAD_BUTTON_A) != 0) {
             state->spinSpeed += 14.8f;
         }
         if (state->spinSpeed > 80.0f) {

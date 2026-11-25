@@ -467,6 +467,7 @@ GameObject* camcontrol_findBestTarget(CamcontrolCameraState* cameraState, ObjAni
     for (; idx < objCount; ptr++, idx++) {
         obj = *ptr;
         bounds = obj->anim.hitVolumeBounds;
+        if ((obj->anim.resetHitboxFlags & INTERACT_FLAG_DISABLED) != 0) { continue; }
         accept = camcontrol_isTargetCandidate(obj, bounds);
         if (accept == 0) {
             continue;

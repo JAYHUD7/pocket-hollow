@@ -25,7 +25,7 @@ constexpr Uint64 kDurationNs = 2 * SDL_NS_PER_SECOND;
 constexpr Uint64 kFadeNs = SDL_NS_PER_SECOND / 2;
 constexpr Uint64 kFramePeriodNs = SDL_NS_PER_SECOND / 60;
 
-constexpr std::string_view kName = "FOXHOLLOW";
+constexpr std::string_view kName = "POCKET-HOLLOW";
 constexpr std::string_view kGame = "STAR FOX ADVENTURES";
 
 constexpr float kMarkHeight = 48.f;

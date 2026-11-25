@@ -6,13 +6,13 @@ import java.io.*; import java.lang.reflect.Array; import java.util.zip.*;
 public class LauncherActivity extends Activity {
   static final int REQ_ISO = 101, REQ_DRV = 102; static boolean didWarmReopen = false; static final String PREFS = "foxhollow_pocket_prefs_v11";
   File baseDir; TextView isoBadge, isoTxt, drvBadge, drvTxt, progTxt, topIsoPill, topDrvPill;
-  FrameLayout progBar; View progFill; Button playBtn; int curTab = 0; float scaleH = 1f; String detectedGpu = "";
+  FrameLayout progBar; View progFill; Button playBtn; int curTab = 0; float scaleH = 1f; String detectedGpu = ""; volatile boolean hdDownloading = false;
   final TextView[] tabBtns = (TextView[]) Array.newInstance(TextView.class, 3);
   final View[] tabPages = (View[]) Array.newInstance(View.class, 4);
   final String[] optLabels = {"Resolution Scale", "Aspect Ratio", "V-Sync", "Anisotropic", "Graphics API", "Language", "Overlay Position", "Overlay Size", "Driver Mode"};
   final String[][] optItems = {{"4.0x (2160p)", "3.0x (1440p)", "2.5x", "2.0x (1080p)", "1.5x", "1.0x (Native)"}, {"Widescreen (16:9)", "Original (4:3)"}, {"Enabled", "Disabled"}, {"16x", "8x", "4x", "2x", "1x"}, {"Vulkan", "OpenGL ES"}, {"English", "Francais", "Deutsch", "Italiano", "Espanol"}, {"Top-Left", "Top-Right", "Bottom-Left", "Bottom-Right"}, {"Compact", "Medium", "Large"}, {"Auto (Recommended)", "Bundled Turnip (A6xx/A7xx)", "Bundled Turnip (A8xx)", "Bundled Qualcomm (v840)", "System Default", "Custom (.zip)"}};
   final int[] optIdx = {3, 1, 0, 0, 0, 0, 0, 1, 0}; final TextView[] optVal = (TextView[]) Array.newInstance(TextView.class, 9);
-  final boolean[] togState = {true, true, true, false, false, false, false, false, false, false};
+  final boolean[] togState = {false, false, false, false, false, false, false, false, false, false};
   final FrameLayout[] togTrack = (FrameLayout[]) Array.newInstance(FrameLayout.class, 10);
   final View[] togThumb = (View[]) Array.newInstance(View.class, 10);
 
@@ -168,7 +168,7 @@ public class LauncherActivity extends Activity {
     playBtn.setMinHeight(0); playBtn.setMinimumHeight(0); playBtn.setPadding(spx(16), spx(7), spx(16), spx(7)); prep(playBtn);
     playBtn.setBackground(focusBg(0xFF1E293B, 0xFF151D2E, 10, 0xFF334155, 0xFFFFFFFF)); playBtn.setOnFocusChangeListener((v, has) -> { playBtn.setTextColor(has ? 0xFF090C12 : 0xFFF1F5F9); playBtn.setBackground(has ? boxBg(0xFFFBBF24, 0xFFD97706, 10, 2.2f, 0xFFFFFFFF) : boxBg(0xFF1E293B, 0xFF151D2E, 10, 1.0f, 0xFF334155)); });
     LinearLayout.LayoutParams lpPlay = new LinearLayout.LayoutParams(-1, -2); lpPlay.setMargins(0, spx(5), 0, 0);
-    playBtn.setOnClickListener(v -> launch()); sCard.addView(playBtn, lpPlay);
+    playBtn.setOnClickListener(v -> launch()); sCard.addView(playBtn, lpPlay); if (hdDownloading) { playBtn.setEnabled(false); playBtn.setText("DOWNLOADING..."); }
     LinearLayout gPage = makeTabPage(pageHost, 1);
     optRow(gPage, "Resolution Scale", 0); optRow(gPage, "Aspect Ratio", 1); optRow(gPage, "Graphics API", 4);
     optRow(gPage, "V-Sync", 2); optRow(gPage, "Anisotropic", 3); optRow(gPage, "Language", 5);
@@ -363,6 +363,119 @@ public class LauncherActivity extends Activity {
     setProgPermille(p1);
     try (FileWriter fw = new FileWriter(marker)) { fw.write("1"); }
   }
+  void ensureHdTexturesReady() {
+    if (hdDownloading || !Array.getBoolean(togState, 0)) return;
+    File md = new File(baseDir, "mods"); md.mkdirs();
+    File hd = new File(md, "com.marcelus.hd-textures");
+    if (new File(hd, ".extracted_ok").exists()) return;
+    hdDownloading = true;
+    if (playBtn != null) { playBtn.setEnabled(false); playBtn.setText("DOWNLOADING..."); }
+    busy(true, "Preparing HD Textures..."); setProgPermille(20);
+    new Thread(() -> {
+      try {
+        extractHdTextures(hd, 20, 1000);
+        hdDownloading = false;
+        runOnUiThread(() -> {
+          if (playBtn != null) { playBtn.setEnabled(true); playBtn.setText("LAUNCH GAME"); }
+          setProgPermille(1000); busy(false, "Ready for Launch"); refresh();
+        });
+      } catch (Exception ex) {
+        hdDownloading = false;
+        final String em = String.valueOf(ex.getMessage());
+        runOnUiThread(() -> {
+          busy(false, "HD Textures Download Needed"); setProgPermille(0);
+          new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+            .setTitle("HD Textures Download Failed")
+            .setMessage(em + "\n\nMake sure you are online or disable HD Textures to launch without them.")
+            .setCancelable(false)
+            .setPositiveButton("Retry", (dd, w) -> ensureHdTexturesReady())
+            .setNegativeButton("Disable HD Textures", (dd, w) -> {
+              Array.setBoolean(togState, 0, false);
+              savePrefs();
+              if (playBtn != null) { playBtn.setEnabled(true); playBtn.setText("LAUNCH GAME"); }
+              busy(false, "Ready for Launch"); refresh();
+            }).show();
+        });
+      }
+    }).start();
+  }
+
+  void extractHdTextures(File destDir, int p0, int p1) throws Exception {
+    File marker = new File(destDir, ".extracted_ok"); if (marker.exists()) { setProgPermille(p1); return; }
+    try (android.content.res.AssetFileDescriptor afd = getAssets().openFd("bundled_hd_textures.zip")) {
+      extractAssetZip("bundled_hd_textures.zip", destDir, "HD Textures", p0, p1);
+      return;
+    } catch (Throwable ignored) {}
+    int pMid = p0 + ((p1 - p0) * 55) / 100;
+    File tmpZip = new File(getCacheDir(), "hd_textures_dl.zip");
+    if (tmpZip.exists()) tmpZip.delete();
+    String urlStr = "https://github.com";
+    java.net.HttpURLConnection conn = null;
+    for (int hop = 0; hop < 8; hop++) {
+      java.net.URL u = new java.net.URL(urlStr);
+      conn = (java.net.HttpURLConnection) u.openConnection();
+      conn.setInstanceFollowRedirects(false);
+      conn.setConnectTimeout(15000);
+      conn.setReadTimeout(30000);
+      conn.setRequestProperty("User-Agent", "Pocket-Hollow-Android");
+      int code = conn.getResponseCode();
+      if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
+        String loc = conn.getHeaderField("Location");
+        conn.disconnect();
+        if (loc == null || loc.isEmpty()) throw new IOException("Empty redirect location");
+        urlStr = new java.net.URL(u, loc).toString();
+        continue;
+      }
+      if (code != 200) throw new IOException("HD Textures download failed (HTTP " + code + ")");
+      break;
+    }
+    if (conn == null) throw new IOException("Failed to connect to GitHub Release");
+    long totBytes = conn.getContentLengthLong();
+    if (totBytes <= 0L) totBytes = 415130000L;
+    long dlBytes = 0L; long lastUi = 0L;
+    try (InputStream in = new BufferedInputStream(conn.getInputStream(), 262144); FileOutputStream fo = new FileOutputStream(tmpZip)) {
+      byte[] buf = (byte[]) Array.newInstance(byte.class, 65536);
+      int n;
+      while ((n = in.read(buf)) > 0) {
+        fo.write(buf, 0, n);
+        dlBytes += n;
+        long now = SystemClock.uptimeMillis();
+        if (now - lastUi >= 150L) {
+          lastUi = now;
+          int frac = (int) Math.min(1000L, (dlBytes * 1000L) / Math.max(1L, totBytes));
+          final int pm = p0 + ((pMid - p0) * frac) / 1000;
+          final int pct = frac / 10;
+          final long mbDone = dlBytes / 1048576L;
+          final long mbTot = totBytes / 1048576L;
+          setProgPermille(pm);
+          runOnUiThread(() -> { if (progTxt != null) progTxt.setText("Downloading HD Textures: " + pct + "% (" + mbDone + " / " + mbTot + " MB)"); });
+        }
+      }
+    } finally { conn.disconnect(); }
+    del(destDir); destDir.mkdirs();
+    long estUnpacked = Math.max(1L, tmpZip.length());
+    long readBytes = 0L; int files = 0; lastUi = 0L;
+    try (ZipInputStream z = new ZipInputStream(new BufferedInputStream(new FileInputStream(tmpZip), 262144))) {
+      ZipEntry e; byte[] b = (byte[]) Array.newInstance(byte.class, 65536);
+      while ((e = z.getNextEntry()) != null) {
+        if (e.isDirectory()) continue;
+        String rel = e.getName().replace((char) 92, (char) 47); if (rel.endsWith("/")) continue;
+        File out = new File(destDir, rel); File par = out.getParentFile(); if (par != null) par.mkdirs();
+        try (FileOutputStream fo = new FileOutputStream(out)) { int n; while ((n = z.read(b)) > 0) { fo.write(b, 0, n); readBytes += n; } }
+        files++; long now = SystemClock.uptimeMillis();
+        if (now - lastUi >= 140L) {
+          lastUi = now; final int fFiles = files;
+          int frac = (int) Math.min(980L, (readBytes * 1000L) / estUnpacked);
+          final int pm = pMid + ((p1 - pMid) * frac) / 1000; final int pct = pm / 10;
+          setProgPermille(pm);
+          runOnUiThread(() -> { if (progTxt != null) progTxt.setText("Unpacking HD Textures (" + pct + "% - " + fFiles + " files)"); });
+        }
+      }
+    } finally { tmpZip.delete(); }
+    setProgPermille(p1);
+    try (FileWriter fw = new FileWriter(marker)) { fw.write("1"); }
+  }
+
   void refresh() {
     File iso = new File(baseDir, "game.iso"); boolean hasIso = iso.exists() && iso.length() > 1048576L;
     if (isoBadge != null) { isoBadge.setText(hasIso ? "READY" : "MISSING"); isoBadge.setTextColor(hasIso ? 0xFF34D399 : 0xFFFBBF24); }
@@ -408,7 +521,7 @@ public class LauncherActivity extends Activity {
     }).start();
   }
   void savePrefs() { SharedPreferences.Editor e = getSharedPreferences(PREFS, MODE_PRIVATE).edit(); for (int k = 0; k < 9; k++) e.putInt("o" + k, Array.getInt(optIdx, k)); for (int t = 0; t < 10; t++) e.putBoolean("t" + t, Array.getBoolean(togState, t)); e.apply(); }
-  void loadPrefs() { SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE); int[] def = {3, 1, 0, 0, 0, 0, 0, 1, 0}; for (int k = 0; k < 9; k++) { int v = p.getInt("o" + k, Array.getInt(def, k)); Array.setInt(optIdx, k, v); String[] row = (String[]) Array.get(optItems, k); TextView tv = (TextView) Array.get(optVal, k); if (tv != null) tv.setText((String) Array.get(row, v) + " ▾"); } boolean[] tdef = {true, true, true, false, false, false, false, false, false, false}; for (int t = 0; t < 10; t++) setIosSwitchVisual(t, p.getBoolean("t" + t, Array.getBoolean(tdef, t)), false); }
+  void loadPrefs() { SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE); int[] def = {3, 1, 0, 0, 0, 0, 0, 1, 0}; for (int k = 0; k < 9; k++) { int v = p.getInt("o" + k, Array.getInt(def, k)); Array.setInt(optIdx, k, v); String[] row = (String[]) Array.get(optItems, k); TextView tv = (TextView) Array.get(optVal, k); if (tv != null) tv.setText((String) Array.get(row, v) + " ▾"); } boolean[] tdef = {false, false, false, false, false, false, false, false, false, false}; for (int t = 0; t < 10; t++) setIosSwitchVisual(t, p.getBoolean("t" + t, Array.getBoolean(tdef, t)), false); }
   void busy(boolean b, String m) { if (progTxt != null) progTxt.setText(m); }
   void err(String t, String m) { new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle(t).setMessage(m).setPositiveButton("OK", null).show(); }
   void del(File f) { if (f.isDirectory()) { File[] c = f.listFiles(); if (c != null) for (File x : c) del(x); } f.delete(); }

@@ -55,7 +55,7 @@ public class FoxhollowActivity extends BorealisActivity {
   }
   CharSequence buildTelemetryPill() {
     SpannableStringBuilder sb = new SpannableStringBuilder();
-    if (sFps) addSeg(sb, "FPS", String.format("%.1f", curFps), curFps >= 55f ? 0xFF34D399 : (curFps >= 40f ? 0xFFFBBF24 : 0xFFF87171));
+    if (sFps) addSeg(sb, "FPS", String.format("%.0f", curFps), curFps >= 55f ? 0xFF34D399 : (curFps >= 40f ? 0xFFFBBF24 : 0xFFF87171));
     if (sFt) addSeg(sb, "", String.format("%.1f ms", curMs), 0xFFE2E8F0);
     if (sCpu) { long khz = readMaxCpuKhz(); if (khz > 0) addSeg(sb, "CPU", String.format("%.2f GHz", khz / 1000000f), 0xFF93C5FD); }
     if (sTemp) { float tc = readTempC(); if (tc > 0f) addSeg(sb, "", String.format("%.1f\u00B0C", tc), tc >= 75f ? 0xFFF87171 : 0xFFFDE68A); }

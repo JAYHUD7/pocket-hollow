@@ -10,6 +10,7 @@
 #include "dolphin/gx/GXTransform.h"
 #include "dolphin/mtx.h"
 #include "track/intersect.h"
+#include "main/track_dolphin.h"
 #include "main/rcp_dolphin.h"
 #include "dolphin/mtx/vec.h"
 #include "main/vecmath.h"

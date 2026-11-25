@@ -6617,7 +6617,7 @@ int Tricky_updateSideCommandPrompts(GameObject* obj) {
             state->commandRequestBits = 0;
         }
         commandMask = state->commandRequestBits | 9;
-        { extern GameObject* Camera_getTarget(void); GameObject* curTgt = Camera_getTarget(); u32 tgtMask = 0; for (i = 0; i < state->commandCount; i++) { if (curTgt != NULL && state->commands[i].targetObj == curTgt) { tgtMask |= (1 << state->commands[i].type); } } if (tgtMask != 0) { commandMask |= tgtMask; } else { for (i = 0; i < state->commandCount; i++) { commandMask |= (1 << state->commands[i].type); } } }
+        { extern GameObject* Camera_getTarget(void); GameObject* curTgt = Camera_getTarget(); u32 tgtMask = 0; u8 hasTargeted = 0; for (i = 0; i < state->commandCount; i++) { GameObject* cTgt = state->commands[i].targetObj; if (cTgt == NULL || cTgt == obj) { commandMask |= (1 << state->commands[i].type); } else { hasTargeted = 1; if (curTgt != NULL && cTgt == curTgt) { tgtMask |= (1 << state->commands[i].type); } } } if (tgtMask != 0) { commandMask |= tgtMask; } else if (hasTargeted) { for (i = 0; i < state->commandCount; i++) { GameObject* cTgt = state->commands[i].targetObj; if (cTgt != NULL && cTgt != obj) { commandMask |= (1 << state->commands[i].type); } } } }
         if (((state->stateIndex == 8) || (state->stateIndex == 0xd)) ||
             ((state->stateIndex == 0xe && (state->substate == 1)))) {
             commandMask |= 0x10;

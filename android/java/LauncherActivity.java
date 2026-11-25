@@ -159,6 +159,22 @@ public class LauncherActivity extends Activity {
 
     LinearLayout sCard = box(rightCol, 0.90f, false);
     cardHdr(sCard, "LAUNCH STATUS", "READY", 0xFF34D399);
+    if (topDrvPill != null && topDrvPill.getParent() instanceof LinearLayout) {
+      LinearLayout topRow = (LinearLayout) topDrvPill.getParent();
+      TextView bugPill = new TextView(this);
+      bugPill.setText("REPORT BUG");
+      bugPill.setTextColor(0xFFFACC15);
+      bugPill.setTextSize(TypedValue.COMPLEX_UNIT_PX, spx(9f));
+      bugPill.setTypeface(Typeface.DEFAULT_BOLD);
+      bugPill.setBackground(boxBg(0xFF1E293B, 0xFF151D2E, 99, 1.0f, 0xFFF59E0B));
+      bugPill.setPadding(spx(8), spx(2), spx(8), spx(2));
+      LinearLayout.LayoutParams lpBug = new LinearLayout.LayoutParams(-2, -2);
+      lpBug.setMargins(spx(6), 0, 0, 0);
+      prep(bugPill);
+      bugPill.setOnFocusChangeListener((v, has) -> bugPill.setBackground(has ? boxBg(0xFF334155, 0xFF1E293B, 99, 1.5f, 0xFFFFFFFF) : boxBg(0xFF1E293B, 0xFF151D2E, 99, 1.0f, 0xFFF59E0B)));
+      bugPill.setOnClickListener(v -> openBugReport());
+      topRow.addView(bugPill, topRow.indexOfChild(topDrvPill) + 1, lpBug);
+    }
     progBar = new FrameLayout(this); progBar.setBackground(boxBg(0xFF0A0E17, 0xFF0A0E17, 6, 1f, 0xFF1F2A40));
     LinearLayout.LayoutParams lpPb = new LinearLayout.LayoutParams(-1, spx(8)); lpPb.setMargins(0, spx(3), 0, spx(3));
     progFill = new View(this); progFill.setBackground(boxBg(0xFFF59E0B, 0xFFD97706, 5, 0f, 0)); progBar.addView(progFill, new FrameLayout.LayoutParams(-1, -1));
@@ -168,7 +184,8 @@ public class LauncherActivity extends Activity {
     playBtn.setMinHeight(0); playBtn.setMinimumHeight(0); playBtn.setPadding(spx(16), spx(7), spx(16), spx(7)); prep(playBtn);
     playBtn.setBackground(focusBg(0xFF1E293B, 0xFF151D2E, 10, 0xFF334155, 0xFFFFFFFF)); playBtn.setOnFocusChangeListener((v, has) -> { playBtn.setTextColor(has ? 0xFF090C12 : 0xFFF1F5F9); playBtn.setBackground(has ? boxBg(0xFFFBBF24, 0xFFD97706, 10, 2.2f, 0xFFFFFFFF) : boxBg(0xFF1E293B, 0xFF151D2E, 10, 1.0f, 0xFF334155)); });
     LinearLayout.LayoutParams lpPlay = new LinearLayout.LayoutParams(-1, -2); lpPlay.setMargins(0, spx(5), 0, 0);
-    playBtn.setOnClickListener(v -> launch()); sCard.addView(playBtn, lpPlay); if (hdDownloading) { playBtn.setEnabled(false); playBtn.setText("DOWNLOADING..."); }
+    playBtn.setOnClickListener(v -> launch()); sCard.addView(playBtn, lpPlay);
+ if (hdDownloading) { playBtn.setEnabled(false); playBtn.setText("DOWNLOADING..."); }
     LinearLayout gPage = makeTabPage(pageHost, 1);
     optRow(gPage, "Resolution Scale", 0); optRow(gPage, "Aspect Ratio", 1); optRow(gPage, "Graphics API", 4);
     optRow(gPage, "V-Sync", 2); optRow(gPage, "Anisotropic", 3); optRow(gPage, "Language", 5);
@@ -506,6 +523,27 @@ public class LauncherActivity extends Activity {
     if (topDrvPill != null) topDrvPill.setText("DRIVER: " + bdg);
     if (drvTxt != null) drvTxt.setText(desc + "  -  " + mCnt + " Mods");
   }
+  void openBugReport() {
+    try {
+      String[] sc = {"4.0x", "3.0x", "2.5x", "2.0x", "1.5x", "1.0x"};
+      String[] dm = {"Auto", "Turnip (A6xx/A7xx)", "Turnip (A8xx)", "Qualcomm (v840)", "System Default", "Custom (.zip)"};
+      String body = "**Device:** " + Build.MANUFACTURER + " " + Build.MODEL + "\n"
+          + "**Android:** " + Build.VERSION.RELEASE + " (SDK " + Build.VERSION.SDK_INT + ")\n"
+          + "**GPU:** " + detectGpuRenderer() + "\n"
+          + "**App Version:** v1.2.2\n"
+          + "**Driver Mode:** " + (String) Array.get(dm, Math.min(5, Array.getInt(optIdx, 8))) + "\n"
+          + "**Resolution Scale:** " + (String) Array.get(sc, Math.min(5, Array.getInt(optIdx, 0))) + "\n"
+          + "**HD Textures:** " + (Array.getBoolean(togState, 0) ? "ON" : "OFF") + "\n\n"
+          + "**What happened:**\n";
+      String url = "https://github.com"
+          + Uri.encode("Bug Report - " + Build.MODEL)
+          + "&body=" + Uri.encode(body);
+      startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+    } catch (Throwable ex) {
+      err("Bug Report", "Visit https://github.com to report a bug.");
+    }
+  }
+
   void launch() {
     File chkIso = new File(baseDir, "game.iso"); if (!chkIso.exists() || chkIso.length() < 1048576L) { promptIso(); return; }
     savePrefs(); if (playBtn != null) playBtn.setEnabled(false); busy(true, "Unpacking mods..."); setProgPermille(40);

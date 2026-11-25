@@ -6,7 +6,7 @@ import android.view.*; import android.widget.*; import java.io.*; import dev.enc
 
 public class FoxhollowActivity extends BorealisActivity {
   TextView hudView; Handler hudHandler; Choreographer.FrameCallback frameCb;
-  long lastFrameNs = 0, secStartNs = 0; int frameCnt = 0, totalFrames = 0; boolean bootCleared = false; float curFps = 0f, curMs = 0f;
+  long lastFrameNs = 0, secStartNs = 0; int frameCnt = 0, totalFrames = 0; boolean bootCleared = false; float curFps = 0f, curMs = 0f; volatile long cachedKhz = 0; volatile float cachedTemp = 0f; volatile String cachedBat = null; volatile long cachedRamKb = 0L;
   boolean sFps, sFt, sTemp, sBat, sRam, sCpu, isNarrow; int hudPos = 0, hudSize = 1;
 
   @Override protected void onCreate(Bundle savedInstanceState) {
@@ -24,7 +24,7 @@ public class FoxhollowActivity extends BorealisActivity {
       try { hudSize = Integer.parseInt(i.getStringExtra("FOXHOLLOW_STAT_SIZE")); } catch (Throwable ignored) {}
     }
     isNarrow = i != null && "narrow".equals(i.getStringExtra("FOXHOLLOW_SCREEN_STYLE"));
-    super.onCreate(savedInstanceState);
+    super.onCreate(savedInstanceState); try { getWindow().getDecorView().requestUnbufferedDispatch(InputDevice.SOURCE_ANY); } catch (Throwable ignored) {} if (Build.VERSION.SDK_INT >= 24) { try { getWindow().setSustainedPerformanceMode(true); } catch (Throwable ignored) {} }
     if (isNarrow) {
       getWindow().getDecorView().setBackgroundColor(0xFF000000);
       View dv = getWindow().getDecorView(); dv.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or2, ob) -> applyNarrowSurface(dv)); dv.post(() -> applyNarrowSurface(dv));
@@ -41,11 +41,11 @@ public class FoxhollowActivity extends BorealisActivity {
     FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, grav); int m = Math.round(14f * d); lp.setMargins(m, m, m, m); addContentView(hudView, lp);
     frameCb = now -> {
       if (lastFrameNs != 0) curMs = (now - lastFrameNs) / 1000000f; lastFrameNs = now; frameCnt++; totalFrames++; if (!bootCleared && totalFrames > 30) { bootCleared = true; try { String cd = getIntent().getStringExtra("FOXHOLLOW_CACHE_DIR"); if (cd != null) new File(cd, "boot_guard.flag").delete(); } catch (Throwable ignored) {} }
-      if (secStartNs == 0) secStartNs = now; else if (now - secStartNs >= 500000000L) { curFps = (frameCnt * 1000000000f) / (now - secStartNs); frameCnt = 0; secStartNs = now; }
+      if (secStartNs == 0) secStartNs = now; else if (now - secStartNs >= 1000000000L) { curFps = Math.round((frameCnt * 1000000000f) / (now - secStartNs)); frameCnt = 0; secStartNs = now; }
       if (hudView != null && hudView.getVisibility() == View.VISIBLE) Choreographer.getInstance().postFrameCallback(frameCb);
     };
     Choreographer.getInstance().postFrameCallback(frameCb);
-    hudHandler = new Handler(Looper.getMainLooper());
+    Thread statBg = new Thread(() -> { while (!isFinishing()) { try { if (sCpu) cachedKhz = readMaxCpuKhz(); if (sTemp) cachedTemp = readTempC(); if (sBat) cachedBat = readBatteryStr(); if (sRam) cachedRamKb = readGameRamKb(); Thread.sleep(1000); } catch (Throwable ignored) {} } }); statBg.setDaemon(true); statBg.start(); hudHandler = new Handler(Looper.getMainLooper());
     hudHandler.post(new Runnable() { @Override public void run() { if (hudView != null) { hudView.setText(buildTelemetryPill()); hudHandler.postDelayed(this, 500); } } });
   }
   void addSeg(SpannableStringBuilder sb, String lbl, String val, int valCol) {
@@ -57,10 +57,10 @@ public class FoxhollowActivity extends BorealisActivity {
     SpannableStringBuilder sb = new SpannableStringBuilder();
     if (sFps) addSeg(sb, "FPS", String.format("%.0f", curFps), curFps >= 55f ? 0xFF34D399 : (curFps >= 40f ? 0xFFFBBF24 : 0xFFF87171));
     if (sFt) addSeg(sb, "", String.format("%.1f ms", curMs), 0xFFE2E8F0);
-    if (sCpu) { long khz = readMaxCpuKhz(); if (khz > 0) addSeg(sb, "CPU", String.format("%.2f GHz", khz / 1000000f), 0xFF93C5FD); }
-    if (sTemp) { float tc = readTempC(); if (tc > 0f) addSeg(sb, "", String.format("%.1f\u00B0C", tc), tc >= 75f ? 0xFFF87171 : 0xFFFDE68A); }
-    if (sRam) { long kb = readGameRamKb(); if (kb > 0) addSeg(sb, "RAM", kb >= 1048576L ? String.format("%.2fG", kb / 1048576f) : String.format("%dM", kb / 1024L), 0xFFCBD5E1); }
-    if (sBat) { BatteryManager bm = (BatteryManager) getSystemService(BATTERY_SERVICE); int pct = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY); int ua = Math.abs(bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)); addSeg(sb, "BAT", ua > 1000 ? String.format("%d%% (%.1fW)", pct, (ua / 1000000f) * 3.85f) : (pct + "%"), 0xFF67E8F9); }
+    if (sCpu) { long khz = cachedKhz; if (khz > 0) addSeg(sb, "CPU", String.format("%.2f GHz", khz / 1000000f), 0xFF93C5FD); }
+    if (sTemp) { float tc = cachedTemp; if (tc > 0f) addSeg(sb, "", String.format("%.1f\u00B0C", tc), tc >= 75f ? 0xFFF87171 : 0xFFFDE68A); }
+    if (sRam) { long kb = cachedRamKb; if (kb > 0) addSeg(sb, "RAM", kb >= 1048576L ? String.format("%.2fG", kb / 1048576f) : String.format("%dM", kb / 1024L), 0xFFCBD5E1); }
+    if (sBat && cachedBat != null) { addSeg(sb, "BAT", cachedBat, 0xFF67E8F9); }
     return sb;
   }
   @Override public void onWindowFocusChanged(boolean hasFocus) { super.onWindowFocusChanged(hasFocus); if (hasFocus && isNarrow) applyNarrowSurface(getWindow().getDecorView()); }
@@ -88,6 +88,7 @@ public class FoxhollowActivity extends BorealisActivity {
     return rssKb + cachedGfxKb;
   }
 
+  String readBatteryStr() { try { BatteryManager bm = (BatteryManager) getSystemService(BATTERY_SERVICE); int pct = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY); int ua = Math.abs(bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)); return ua > 1000 ? String.format("%d%% (%.1fW)", pct, (ua / 1000000f) * 3.85f) : (pct + "%"); } catch (Throwable ignored) { return null; } }
   long readMaxCpuKhz() { long best = 0; for (int c = 0; c < 8; c++) { try (BufferedReader br = new BufferedReader(new FileReader("/sys/devices/system/cpu/cpu" + c + "/cpufreq/scaling_cur_freq"))) { long v = Long.parseLong(br.readLine().trim()); if (v > best) best = v; } catch (Throwable ignored) {} } return best; }
   float readTempC() { for (int z = 0; z < 16; z++) { try (BufferedReader br = new BufferedReader(new FileReader("/sys/class/thermal/thermal_zone" + z + "/temp"))) { float v = Float.parseFloat(br.readLine().trim()); if (v > 1000f) v /= 1000f; if (v >= 20f && v <= 115f) return v; } catch (Throwable ignored) {} } Intent bi = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED)); return bi != null ? bi.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) / 10f : 0f; }
 

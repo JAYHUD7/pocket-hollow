@@ -188,7 +188,7 @@ public class LauncherActivity extends Activity {
  if (hdDownloading) { playBtn.setEnabled(false); playBtn.setText("DOWNLOADING..."); }
     LinearLayout gPage = makeTabPage(pageHost, 1);
     optRow(gPage, "Resolution Scale", 0); optRow(gPage, "Aspect Ratio", 1); optRow(gPage, "Graphics API", 4);
-    optRow(gPage, "V-Sync", 2); optRow(gPage, "Anisotropic", 3); optRow(gPage, "Language", 5);
+    optRow(gPage, "Anisotropic", 3); optRow(gPage, "Language", 5);
 
     LinearLayout mPage = makeTabPage(pageHost, 2);
     iosSwitchRow(mPage, "HD Texture Pack (4x)", 0); iosSwitchRow(mPage, "Water Reflections", 1); iosSwitchRow(mPage, "Hold-A Auto-Mash", 2);

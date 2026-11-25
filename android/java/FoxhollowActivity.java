@@ -59,12 +59,25 @@ public class FoxhollowActivity extends BorealisActivity {
     if (sFt) addSeg(sb, "", String.format("%.1f ms", curMs), 0xFFE2E8F0);
     if (sCpu) { long khz = readMaxCpuKhz(); if (khz > 0) addSeg(sb, "CPU", String.format("%.2f GHz", khz / 1000000f), 0xFF93C5FD); }
     if (sTemp) { float tc = readTempC(); if (tc > 0f) addSeg(sb, "", String.format("%.1f\u00B0C", tc), tc >= 75f ? 0xFFF87171 : 0xFFFDE68A); }
-    if (sRam) { ActivityManager am = (ActivityManager) getSystemService(ACTIVITY_SERVICE); ActivityManager.MemoryInfo mi = new ActivityManager.MemoryInfo(); am.getMemoryInfo(mi); addSeg(sb, "RAM", String.format("%.1fG", (mi.totalMem - mi.availMem)/1073741824f), 0xFFCBD5E1); }
+    if (sRam) { long kb = readGameRamKb(); if (kb > 0) addSeg(sb, "RAM", kb >= 1048576L ? String.format("%.2fG", kb / 1048576f) : String.format("%dM", kb / 1024L), 0xFFCBD5E1); }
     if (sBat) { BatteryManager bm = (BatteryManager) getSystemService(BATTERY_SERVICE); int pct = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY); int ua = Math.abs(bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)); addSeg(sb, "BAT", ua > 1000 ? String.format("%d%% (%.1fW)", pct, (ua / 1000000f) * 3.85f) : (pct + "%"), 0xFF67E8F9); }
     return sb;
   }
   @Override public void onWindowFocusChanged(boolean hasFocus) { super.onWindowFocusChanged(hasFocus); if (hasFocus && isNarrow) applyNarrowSurface(getWindow().getDecorView()); }
   @Override protected void onDestroy() { super.onDestroy(); System.exit(0); }
+  long readGameRamKb() {
+    try (BufferedReader br = new BufferedReader(new FileReader("/proc/self/status"))) {
+      String line;
+      while ((line = br.readLine()) != null) {
+        if (line.startsWith("VmRSS:")) {
+          String digits = line.replaceAll("[^0-9]", "");
+          if (!digits.isEmpty()) return Long.parseLong(digits);
+        }
+      }
+    } catch (Throwable ignored) {}
+    return 0L;
+  }
+
   long readMaxCpuKhz() { long best = 0; for (int c = 0; c < 8; c++) { try (BufferedReader br = new BufferedReader(new FileReader("/sys/devices/system/cpu/cpu" + c + "/cpufreq/scaling_cur_freq"))) { long v = Long.parseLong(br.readLine().trim()); if (v > best) best = v; } catch (Throwable ignored) {} } return best; }
   float readTempC() { for (int z = 0; z < 16; z++) { try (BufferedReader br = new BufferedReader(new FileReader("/sys/class/thermal/thermal_zone" + z + "/temp"))) { float v = Float.parseFloat(br.readLine().trim()); if (v > 1000f) v /= 1000f; if (v >= 20f && v <= 115f) return v; } catch (Throwable ignored) {} } Intent bi = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED)); return bi != null ? bi.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) / 10f : 0f; }
 

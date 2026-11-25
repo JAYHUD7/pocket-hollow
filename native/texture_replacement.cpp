@@ -45,7 +45,7 @@ namespace aurora::texture {
 namespace {
 constexpr Module Log{"aurora::texture"};
 
-constexpr uint64_t kReplacementCacheBudgetBytes = 805306368ULL; // 768MB
+constexpr uint64_t kReplacementCacheBudgetBytes = 1610612736ULL; // 1.5GB
 constexpr uint64_t kReplacementWildcardTextureHash = kWildcardTextureHash;
 constexpr uint64_t kReplacementWildcardTlutHash = kWildcardTlutHash;
 

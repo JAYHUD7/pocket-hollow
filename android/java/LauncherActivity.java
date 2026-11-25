@@ -11,7 +11,7 @@ public class LauncherActivity extends Activity {
   final View[] tabPages = (View[]) Array.newInstance(View.class, 4);
   final String[] optLabels = {"Resolution Scale", "Aspect Ratio", "V-Sync", "Anisotropic", "Graphics API", "Language", "Overlay Position", "Overlay Size", "Driver Mode"};
   final String[][] optItems = {{"4.0x (2160p)", "3.0x (1440p)", "2.5x", "2.0x (1080p)", "1.5x", "1.0x (Native)"}, {"Widescreen (16:9)", "Original (4:3)"}, {"Enabled", "Disabled"}, {"16x", "8x", "4x", "2x", "1x"}, {"Vulkan", "OpenGL ES"}, {"English", "Francais", "Deutsch", "Italiano", "Espanol"}, {"Top-Left", "Top-Right", "Bottom-Left", "Bottom-Right"}, {"Compact", "Medium", "Large"}, {"Auto (Recommended)", "Bundled Turnip (A6xx/A7xx)", "Bundled Turnip (A8xx)", "Bundled Qualcomm (v840)", "System Default", "Custom (.zip)"}};
-  final int[] optIdx = {3, 1, 0, 0, 0, 0, 0, 1, 0}; final TextView[] optVal = (TextView[]) Array.newInstance(TextView.class, 9);
+  final int[] optIdx = {4, 1, 0, 2, 0, 0, 0, 1, 0}; final TextView[] optVal = (TextView[]) Array.newInstance(TextView.class, 9);
   final boolean[] togState = {false, false, false, false, false, false, false, false, false, false};
   final FrameLayout[] togTrack = (FrameLayout[]) Array.newInstance(FrameLayout.class, 10);
   final View[] togThumb = (View[]) Array.newInstance(View.class, 10);
@@ -270,16 +270,33 @@ public class LauncherActivity extends Activity {
     if (detectedGpu == null || detectedGpu.isEmpty()) detectedGpu = Build.HARDWARE != null ? Build.HARDWARE : "Unknown GPU";
     return detectedGpu;
   }
+  int detectGpuTier() {
+    String g = detectGpuRenderer().toLowerCase();
+    if (g.contains("adreno")) {
+      if (g.contains("740") || g.contains("750") || g.contains("810") || g.contains("820") || g.contains("825") || g.contains("830") || g.contains("840") || g.contains(" 8")) return 2;
+      if (g.contains("640") || g.contains("650") || g.contains("660") || g.contains("710") || g.contains("720") || g.contains("725") || g.contains("730") || g.contains("732") || g.contains("735")) return 1;
+      return 0;
+    }
+    if (g.contains("immortalis") || g.contains("g715") || g.contains("g720") || g.contains("g925") || g.contains("xclipse 940") || g.contains("xclipse 950")) return 2;
+    if (g.contains("g610") || g.contains("g615") || g.contains("g710") || g.contains("g77") || g.contains("g78") || g.contains("xclipse")) return 1;
+    return 0;
+  }
   String resolveAutoDriverAsset() {
     String g = detectGpuRenderer().toLowerCase();
     if (g.contains("adreno")) {
-      if (g.contains("810") || g.contains("820") || g.contains("825") || g.contains("830") || g.contains("840") || g.contains(" 8")) return null;
-      return "drivers/turnip_ci.zip";
+      if (g.contains("618") || g.contains("619") || g.contains("620") || g.contains("630") || g.contains("640") || g.contains("642") || g.contains("650") || g.contains("660") || g.contains("740") || g.contains("750")) {
+        return "drivers/turnip_ci.zip";
+      }
+      return null;
     }
     return null;
   }
   File prepareActiveDriver() throws Exception {
     int dMode = Array.getInt(optIdx, 8); if (dMode == 4) return null;
+    SharedPreferences sp = getSharedPreferences(PREFS, MODE_PRIVATE);
+    File bg = new File(new File(baseDir, "cache"), "boot_guard.flag");
+    if (dMode == 0 && bg.exists()) { bg.delete(); sp.edit().putBoolean("auto_force_sys", true).apply(); }
+    if (dMode == 0 && sp.getBoolean("auto_force_sys", false)) return null;
     if (dMode == 5) { File icd = new File(new File(getCodeCacheDir(), "custom_driver"), "vk_icd.json"); return icd.exists() ? icd : null; }
     String ap = dMode == 0 ? resolveAutoDriverAsset() : (dMode == 1 ? "drivers/turnip_ci.zip" : (dMode == 2 ? "drivers/turnip_a8xx.zip" : "drivers/qualcomm_adreno.zip"));
     if (ap == null) return null;
@@ -516,12 +533,12 @@ public class LauncherActivity extends Activity {
         i.putExtra("FOXHOLLOW_LANGUAGE", (String) Array.get(lg, Array.getInt(optIdx, 5))); i.putExtra("FOXHOLLOW_DEBUG", "0");
         File icd = null; try { icd = prepareActiveDriver(); } catch (Throwable ignored) {}
         if (icd != null && icd.exists()) { i.putExtra("CUSTOM_VK_ICD", icd.getAbsolutePath()); i.putExtra("CUSTOM_VK_DIR", icd.getParentFile().getAbsolutePath()); }
-        startActivity(i);
+        if (Array.getInt(optIdx, 8) == 0) { try (FileWriter fw = new FileWriter(new File(new File(baseDir, "cache"), "boot_guard.flag"))) { fw.write("1"); } catch (Throwable ignored) {} } startActivity(i);
       });
     }).start();
   }
   void savePrefs() { SharedPreferences.Editor e = getSharedPreferences(PREFS, MODE_PRIVATE).edit(); for (int k = 0; k < 9; k++) e.putInt("o" + k, Array.getInt(optIdx, k)); for (int t = 0; t < 10; t++) e.putBoolean("t" + t, Array.getBoolean(togState, t)); e.apply(); }
-  void loadPrefs() { SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE); int[] def = {3, 1, 0, 0, 0, 0, 0, 1, 0}; for (int k = 0; k < 9; k++) { int v = p.getInt("o" + k, Array.getInt(def, k)); Array.setInt(optIdx, k, v); String[] row = (String[]) Array.get(optItems, k); TextView tv = (TextView) Array.get(optVal, k); if (tv != null) tv.setText((String) Array.get(row, v) + " ▾"); } boolean[] tdef = {false, false, false, false, false, false, false, false, false, false}; for (int t = 0; t < 10; t++) setIosSwitchVisual(t, p.getBoolean("t" + t, Array.getBoolean(tdef, t)), false); }
+  void loadPrefs() { SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE); int tier = detectGpuTier(); int[] def = {tier == 2 ? 3 : (tier == 1 ? 4 : 5), 1, 0, tier == 2 ? 1 : (tier == 1 ? 2 : 3), 0, 0, 0, 1, 0}; for (int k = 0; k < 9; k++) { int v = p.getInt("o" + k, Array.getInt(def, k)); Array.setInt(optIdx, k, v); String[] row = (String[]) Array.get(optItems, k); TextView tv = (TextView) Array.get(optVal, k); if (tv != null) tv.setText((String) Array.get(row, v) + " ▾"); } boolean[] tdef = {false, false, false, false, false, false, false, false, false, false}; for (int t = 0; t < 10; t++) setIosSwitchVisual(t, p.getBoolean("t" + t, Array.getBoolean(tdef, t)), false); }
   void busy(boolean b, String m) { if (progTxt != null) progTxt.setText(m); }
   void err(String t, String m) { new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle(t).setMessage(m).setPositiveButton("OK", null).show(); }
   void del(File f) { if (f.isDirectory()) { File[] c = f.listFiles(); if (c != null) for (File x : c) del(x); } f.delete(); }

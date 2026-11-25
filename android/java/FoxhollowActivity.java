@@ -6,7 +6,7 @@ import android.view.*; import android.widget.*; import java.io.*; import dev.enc
 
 public class FoxhollowActivity extends BorealisActivity {
   TextView hudView; Handler hudHandler; Choreographer.FrameCallback frameCb;
-  long lastFrameNs = 0, secStartNs = 0; int frameCnt = 0; float curFps = 0f, curMs = 0f;
+  long lastFrameNs = 0, secStartNs = 0; int frameCnt = 0, totalFrames = 0; boolean bootCleared = false; float curFps = 0f, curMs = 0f;
   boolean sFps, sFt, sTemp, sBat, sRam, sCpu, isNarrow; int hudPos = 0, hudSize = 1;
 
   @Override protected void onCreate(Bundle savedInstanceState) {
@@ -40,7 +40,7 @@ public class FoxhollowActivity extends BorealisActivity {
     int grav = hudPos == 1 ? (Gravity.TOP | Gravity.END) : hudPos == 2 ? (Gravity.BOTTOM | Gravity.START) : hudPos == 3 ? (Gravity.BOTTOM | Gravity.END) : (Gravity.TOP | Gravity.START);
     FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, grav); int m = Math.round(14f * d); lp.setMargins(m, m, m, m); addContentView(hudView, lp);
     frameCb = now -> {
-      if (lastFrameNs != 0) curMs = (now - lastFrameNs) / 1000000f; lastFrameNs = now; frameCnt++;
+      if (lastFrameNs != 0) curMs = (now - lastFrameNs) / 1000000f; lastFrameNs = now; frameCnt++; totalFrames++; if (!bootCleared && totalFrames > 30) { bootCleared = true; try { String cd = getIntent().getStringExtra("FOXHOLLOW_CACHE_DIR"); if (cd != null) new File(cd, "boot_guard.flag").delete(); } catch (Throwable ignored) {} }
       if (secStartNs == 0) secStartNs = now; else if (now - secStartNs >= 500000000L) { curFps = (frameCnt * 1000000000f) / (now - secStartNs); frameCnt = 0; secStartNs = now; }
       if (hudView != null && hudView.getVisibility() == View.VISIBLE) Choreographer.getInstance().postFrameCallback(frameCb);
     };
@@ -65,17 +65,27 @@ public class FoxhollowActivity extends BorealisActivity {
   }
   @Override public void onWindowFocusChanged(boolean hasFocus) { super.onWindowFocusChanged(hasFocus); if (hasFocus && isNarrow) applyNarrowSurface(getWindow().getDecorView()); }
   @Override protected void onDestroy() { super.onDestroy(); System.exit(0); }
+  long cachedGfxKb = 0L; int gfxTick = 0;
   long readGameRamKb() {
+    long rssKb = 0L;
     try (BufferedReader br = new BufferedReader(new FileReader("/proc/self/status"))) {
       String line;
       while ((line = br.readLine()) != null) {
         if (line.startsWith("VmRSS:")) {
           String digits = line.replaceAll("[^0-9]", "");
-          if (!digits.isEmpty()) return Long.parseLong(digits);
+          if (!digits.isEmpty()) { rssKb = Long.parseLong(digits); break; }
         }
       }
     } catch (Throwable ignored) {}
-    return 0L;
+    if ((gfxTick++ % 4) == 0) {
+      try {
+        android.os.Debug.MemoryInfo dmi = new android.os.Debug.MemoryInfo();
+        android.os.Debug.getMemoryInfo(dmi);
+        String g = dmi.getMemoryStat("summary.graphics");
+        if (g != null && !g.isEmpty()) cachedGfxKb = Long.parseLong(g);
+      } catch (Throwable ignored) {}
+    }
+    return rssKb + cachedGfxKb;
   }
 
   long readMaxCpuKhz() { long best = 0; for (int c = 0; c < 8; c++) { try (BufferedReader br = new BufferedReader(new FileReader("/sys/devices/system/cpu/cpu" + c + "/cpufreq/scaling_cur_freq"))) { long v = Long.parseLong(br.readLine().trim()); if (v > best) best = v; } catch (Throwable ignored) {} } return best; }

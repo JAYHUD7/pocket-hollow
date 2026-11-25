@@ -67,6 +67,61 @@ void Camera_UpdateForObject(Camera* camera) {
         camera->worldYaw = camera->yaw;
         camera->worldPitch = camera->pitch;
         camera->worldRoll = camera->roll;
+        {
+            extern GameObject* Obj_GetPlayerObject(void);
+            GameObject* plr = Obj_GetPlayerObject();
+            if (plr != NULL && plr->anim.classId == 1 && !(plr->objectFlags & 0x1000)) {
+                f32 sx, sy, sz;
+                Obj_GetWorldPosition(plr, &sx, &sy, &sz);
+                sy += 22.0f;
+                f32 dx = camera->worldX - sx;
+                f32 dz = camera->worldZ - sz;
+                f32 hLen = sqrtf(dx * dx + dz * dz);
+                f32 rx = 0.0f, rz = 0.0f;
+                if (hLen > 0.01f) {
+                    rx = (-dz / hLen) * 7.5f;
+                    rz = (dx / hLen) * 7.5f;
+                }
+                f32 pStarts[3][3] = {
+                    { sx, sy, sz },
+                    { sx - rx, sy, sz - rz },
+                    { sx + rx, sy, sz + rz }
+                };
+                f32 pEnds[3][3] = {
+                    { camera->worldX, camera->worldY, camera->worldZ },
+                    { camera->worldX - rx, camera->worldY, camera->worldZ - rz },
+                    { camera->worldX + rx, camera->worldY, camera->worldZ + rz }
+                };
+                int rayIdx;
+                for (rayIdx = 0; rayIdx < 3; rayIdx++) {
+                    TrackHitResults hits;
+                    memset(&hits, 0, sizeof(hits));
+                    trackGetIntersect(plr, pStarts[rayIdx], pEnds[rayIdx], 1, &hits, HITQUERY_TEST_OBJECT_HITBOXES);
+                    if (hits.hitCount > 0) {
+                        int hi;
+                        int maxHits = hits.hitCount > 4 ? 4 : hits.hitCount;
+                        for (hi = 0; hi < maxHits; hi++) {
+                            f32 nx = hits.planes[hi][0];
+                            f32 ny = hits.planes[hi][1];
+                            f32 nz = hits.planes[hi][2];
+                            f32 pd = hits.planes[hi][3];
+                            if (ny > -0.7f && ny < 0.7f) {
+                                f32 dist = nx * pEnds[rayIdx][0] + ny * pEnds[rayIdx][1] + nz * pEnds[rayIdx][2] + pd;
+                                if (dist < 9.5f && dist > -90.0f) {
+                                    f32 push = 9.5f - dist;
+                                    camera->worldX += nx * push;
+                                    camera->worldY += ny * push;
+                                    camera->worldZ += nz * push;
+                                    pEnds[0][0] += nx * push; pEnds[0][1] += ny * push; pEnds[0][2] += nz * push;
+                                    pEnds[1][0] += nx * push; pEnds[1][1] += ny * push; pEnds[1][2] += nz * push;
+                                    pEnds[2][0] += nx * push; pEnds[2][1] += ny * push; pEnds[2][2] += nz * push;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     } else {
         matrixOffset = parent->anim.transformMatrixIndex * 16;
         matrix = (f32*)gObjYawTransformMatrices + matrixOffset;

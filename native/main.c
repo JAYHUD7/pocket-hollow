@@ -144,11 +144,10 @@ static const char* prepare_directory(const char* path) {
 int main(int argc, char* argv[]) { setpriority(PRIO_PROCESS, 0, -19);
         cpu_set_t bigCores;
         CPU_ZERO(&bigCores);
-        for (int c = 6; c < 8; ++c) { CPU_SET(c, &bigCores); }
+        int nCpu = (int)sysconf(_SC_NPROCESSORS_CONF); if (nCpu < 4) nCpu = 8; for (int c = nCpu / 2; c < nCpu; ++c) { CPU_SET(c, &bigCores); }
         sched_setaffinity(0, sizeof(bigCores), &bigCores);
         fhEnableAndroidAdpfSession();
-        mallopt(M_DECAY_TIME, 0);
-        mallopt(M_PURGE, 0); mallopt(-3, 1024 * 1024); setenv("FOXHOLLOW_USER_DIR", "/storage/emulated/0/pocket-hollow", 0); setenv("FOXHOLLOW_CACHE_DIR", "/storage/emulated/0/pocket-hollow/cache", 0); setenv("FOXHOLLOW_FULLSCREEN", "1", 0); setenv("FOXHOLLOW_BACKEND", "vulkan", 0); setenv("FOXHOLLOW_SCREEN_STYLE", "wide", 0);
+        setenv("FOXHOLLOW_USER_DIR", "/storage/emulated/0/pocket-hollow", 0); setenv("FOXHOLLOW_CACHE_DIR", "/storage/emulated/0/pocket-hollow/cache", 0); setenv("FOXHOLLOW_FULLSCREEN", "1", 0); setenv("FOXHOLLOW_BACKEND", "vulkan", 0); setenv("FOXHOLLOW_SCREEN_STYLE", "wide", 0);
   const char* disc;
   fhInstallCrashHandler();
   disc = disc_path(argc, argv);
@@ -206,7 +205,7 @@ int main(int argc, char* argv[]) { setpriority(PRIO_PROCESS, 0, -19);
   fhModsInit(argc, argv, info.userPath);
 
   extern void aurora_dvd_preload_full_iso(void);
-  aurora_dvd_preload_full_iso();
+  /* Stream ISO from storage to keep RAM usage low */
   if (!fhSplashRun()) {
     fhModsShutdown();
     aurora_dvd_close();

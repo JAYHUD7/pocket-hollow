@@ -37,9 +37,9 @@
             </intent-filter>
         </provider>
 
-        <activity android:name="dev.foxhollow.android.LauncherActivity" android:exported="true" android:label="@string/app_name" android:screenOrientation="sensorLandscape"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity><activity android:name="dev.foxhollow.android.FoxhollowActivity"
+        <activity android:name="dev.foxhollow.android.LauncherActivity" android:exported="true" android:label="@string/app_name" android:screenOrientation="sensorLandscape"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity><activity android:name="dev.foxhollow.android.FoxhollowActivity" android:screenOrientation="sensorLandscape"
             android:alwaysRetainTaskState="true"
-            android:configChanges="layoutDirection|locale|grammaticalGender|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
+            android:configChanges="layoutDirection|locale|grammaticalGender|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation|density|touchscreen"
             android:exported="true"
             android:label="@string/app_name"
             android:launchMode="singleInstance"

@@ -1675,7 +1675,7 @@ void* loadCharacter(s16* data, int flags, int arg2, int arg3, void* parent, int 
     tmpl.anim.alpha = 0xff;
     tmpl.msgQueue = NULL;
     tmpl.sphereMapIntensity = 0xff;
-    extern GameObject* getArwing(void); f32 arwMul = (getArwing() != NULL ? 4.0f : 1.6f); tmpl.anim.loadDistance = (f32)(int)(((ObjPlacement*)data)->loadRange << 3) * arwMul;
+    extern GameObject* getArwing(void); f32 arwMul = (getArwing() != NULL ? 4.0f : 1.0f); tmpl.anim.loadDistance = (f32)(int)(((ObjPlacement*)data)->loadRange << 3) * arwMul;
     tmpl.anim.cullDistance2 = (f32)(int)(((ObjPlacement*)data)->unk07 << 3) * arwMul;
     n = (((ObjPlacement*)data)->mapActFlagsHi & 0x18) >> 3;
     tmpl.lightColorSlot = n;

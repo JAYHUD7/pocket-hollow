@@ -14,7 +14,7 @@
 #include "dolphin/mtx/vec.h"
 #include "main/vecmath.h"
 
-f32 gCameraNearPlane = 2.5f;
+f32 gCameraNearPlane = 1.2f;
 f32 gCameraFarPlane = 10000.0f;
 f32 gCameraAspectRatio = 1.7777778f;
 f32 gCameraEffectViewportFarZ = 1.0f;
@@ -894,9 +894,7 @@ f32 Camera_GetAspectRatio(void) {
 }
 
 void Camera_SetAspectRatio(f32 aspectRatio) {
-    (void)aspectRatio;
-    extern f32 fhConfigDisplayAspect(void);
-    gCameraAspectRatio = fhConfigDisplayAspect();
+    gCameraAspectRatio = aspectRatio;
 }
 
 f32 Camera_GetFovY(void) {

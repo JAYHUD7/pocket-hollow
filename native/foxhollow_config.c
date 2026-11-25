@@ -150,7 +150,9 @@ FhScreenStyle fhConfigScreenStyle(void) {
   return sScreenStyle;
 }
 
-int fhConfigScreenStyleIsForced(void) { return fhConfigScreenStyle() != FH_SCREEN_STYLE_AUTO; }
+int fhConfigScreenStyleIsForced(void) {
+    return 0;
+}
 
 int fhConfigScreenStyleIsWide(void) { return fhConfigScreenStyle() == FH_SCREEN_STYLE_WIDE; }
 

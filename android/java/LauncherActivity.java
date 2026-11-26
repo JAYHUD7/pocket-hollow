@@ -7,14 +7,14 @@ public class LauncherActivity extends Activity {
   static final int REQ_ISO = 101, REQ_DRV = 102; static boolean didWarmReopen = false; static final String PREFS = "foxhollow_pocket_prefs_v11";
   File baseDir; TextView isoBadge, isoTxt, drvBadge, drvTxt, progTxt, topIsoPill, topDrvPill;
   FrameLayout progBar; View progFill; Button playBtn; int curTab = 0; float scaleH = 1f; String detectedGpu = ""; volatile boolean hdDownloading = false;
-  final TextView[] tabBtns = (TextView[]) Array.newInstance(TextView.class, 3);
-  final View[] tabPages = (View[]) Array.newInstance(View.class, 4);
+  final TextView[] tabBtns = (TextView[]) Array.newInstance(TextView.class, 4);
+  final View[] tabPages = (View[]) Array.newInstance(View.class, 5);
   final String[] optLabels = {"Resolution Scale", "Aspect Ratio", "V-Sync", "Anisotropic", "Graphics API", "Language", "Overlay Position", "Overlay Size", "Driver Mode", "Touch Control Scale"};
   final String[][] optItems = {{"4.0x (2160p)", "3.0x (1440p)", "2.5x", "2.0x (1080p)", "1.5x", "1.0x (Native)"}, {"Widescreen (16:9)", "Original (4:3)"}, {"Enabled", "Disabled"}, {"16x", "8x", "4x", "2x", "1x"}, {"Vulkan", "OpenGL ES"}, {"English", "Francais", "Deutsch", "Italiano", "Espanol"}, {"Top-Left", "Top-Right", "Bottom-Left", "Bottom-Right"}, {"Compact", "Medium", "Large"}, {"Auto (Recommended)", "Bundled Turnip (A6xx/A7xx)", "Bundled Turnip (A8xx)", "Bundled Qualcomm (v840)", "System Default", "Custom (.zip)"}, {"85% (Compact)", "100% (Standard)", "115% (Large)", "130% (XL)"}};
   final int[] optIdx = {4, 1, 0, 2, 0, 0, 0, 1, 0, 1}; final TextView[] optVal = (TextView[]) Array.newInstance(TextView.class, 10);
-  final boolean[] togState = {false, false, false, false, false, false, false, false, false, false, false, true};
-  final FrameLayout[] togTrack = (FrameLayout[]) Array.newInstance(FrameLayout.class, 12);
-  final View[] togThumb = (View[]) Array.newInstance(View.class, 12);
+  final boolean[] togState = {false, false, false, false, false, false, false, false, false, false, false, true, false};
+  final FrameLayout[] togTrack = (FrameLayout[]) Array.newInstance(FrameLayout.class, 13);
+  final View[] togThumb = (View[]) Array.newInstance(View.class, 13);
 
   int spx(float baseDp) { return Math.max(1, Math.round(baseDp * getResources().getDisplayMetrics().density * scaleH)); }
   GradientDrawable boxBg(int top, int bot, float radDp, float sw, int sc) {
@@ -37,9 +37,9 @@ public class LauncherActivity extends Activity {
   void ensureDirs() { baseDir.mkdirs(); new File(baseDir, "mods").mkdirs(); new File(baseDir, "cache").mkdirs(); }
   void setProgPermille(int pm) { if (progBar == null || progFill == null) return; final int cl = Math.max(0, Math.min(1000, pm)); progBar.post(() -> { int tw = progBar.getWidth(); if (tw <= 0) tw = spx(220); int fw = cl <= 0 ? spx(8) : Math.max(spx(8), (int)((tw * (long)cl)/1000L)); ViewGroup.LayoutParams p = progFill.getLayoutParams(); p.width = Math.min(tw, fw); progFill.setLayoutParams(p); }); }
   void selectTab(int t) {
-    curTab = (t + 4) % 4;
-    for (int p = 0; p < 4; p++) { View pg = (View) Array.get(tabPages, p); if (pg != null) pg.setVisibility(p == curTab ? View.VISIBLE : View.GONE); }
-    for (int i = 0; i < 3; i++) {
+    curTab = (t + 5) % 5;
+    for (int p = 0; p < 5; p++) { View pg = (View) Array.get(tabPages, p); if (pg != null) pg.setVisibility(p == curTab ? View.VISIBLE : View.GONE); }
+    for (int i = 0; i < 4; i++) {
       TextView tb = (TextView) Array.get(tabBtns, i); boolean sel = ((i + 1) == curTab);
       if (tb != null) { tb.setTextColor(sel ? 0xFFFACC15 : 0xFF94A3B8); tb.setBackground(sel ? boxBg(0xFF1E293B, 0xFF151D2E, 7, 1.2f, 0xFFF59E0B) : new ColorDrawable(0)); }
     }
@@ -111,8 +111,8 @@ public class LauncherActivity extends Activity {
     LinearLayout tabStrip = new LinearLayout(this); tabStrip.setOrientation(LinearLayout.HORIZONTAL);
     tabStrip.setBackground(boxBg(0xFF0E131F, 0xFF0B0F19, 10, 1f, 0xFF1F2A40)); tabStrip.setPadding(spx(3), spx(3), spx(3), spx(3));
     LinearLayout.LayoutParams lpTs = new LinearLayout.LayoutParams(-1, -2); lpTs.setMargins(0, 0, 0, spx(7));
-    String[] tabNames = {"GRAPHICS", "MODS", "STATS"};
-    for (int t = 0; t < 3; t++) {
+    String[] tabNames = {"GRAPHICS", "CONTROLS", "MODS", "STATS"};
+    for (int t = 0; t < 4; t++) {
       final int idx = t + 1; LinearLayout cell = new LinearLayout(this); cell.setOrientation(LinearLayout.VERTICAL); cell.setGravity(Gravity.CENTER);
       prep(cell);
       cell.setBackground(focusBg(0x00000000, 0x00000000, 8, 0, 0xFFF59E0B));
@@ -190,11 +190,11 @@ public class LauncherActivity extends Activity {
     optRow(gPage, "Resolution Scale", 0); optRow(gPage, "Aspect Ratio", 1); optRow(gPage, "Graphics API", 4);
     optRow(gPage, "Anisotropic", 3); optRow(gPage, "Language", 5);
 
-    LinearLayout mPage = makeTabPage(pageHost, 2);
-    iosSwitchRow(mPage, "HD Texture Pack (4x)", 0); iosSwitchRow(mPage, "Water Reflections", 1); iosSwitchRow(mPage, "Hold-A Auto-Mash", 2); iosSwitchRow(mPage, "On-Screen Touch Controls", 10); iosSwitchRow(mPage, "Touch Haptic Vibration", 11); optRow(mPage, "Touch Control Scale", 9); Button editLytBtn = secBtn("Set Custom Touch Layout"); editLytBtn.setOnClickListener(v -> openTouchLayoutEditor()); mPage.addView(editLytBtn); Button rstBtn = secBtn("Reset Custom Touch Layout"); rstBtn.setOnClickListener(v -> { getSharedPreferences("fh_touch_cfg", MODE_PRIVATE).edit().clear().apply(); Toast.makeText(this, "Touch layout reset to default", Toast.LENGTH_SHORT).show(); }); mPage.addView(rstBtn);
+    LinearLayout cPage = makeTabPage(pageHost, 2); LinearLayout mPage = makeTabPage(pageHost, 3);
+    iosSwitchRow(mPage, "HD Texture Pack (4x)", 0); iosSwitchRow(mPage, "Water Reflections", 1); iosSwitchRow(mPage, "Hold-A Auto-Mash", 2); buildControlsTab(cPage);
 
-    LinearLayout sPage = makeTabPage(pageHost, 3);
-    iosSwitchRow(sPage, "FPS Counter", 3); iosSwitchRow(sPage, "Frame Time (ms)", 6); iosSwitchRow(sPage, "CPU / SoC Temp (°C)", 4);
+    LinearLayout sPage = makeTabPage(pageHost, 4);
+    iosSwitchRow(sPage, "FPS Counter", 3); iosSwitchRow(sPage, "Frame Time (ms)", 6); iosSwitchRow(sPage, "CPU / SoC Temp (Â°C)", 4);
     iosSwitchRow(sPage, "Battery % & Wattage", 7); iosSwitchRow(sPage, "RAM Memory Usage", 8); iosSwitchRow(sPage, "Peak CPU Clock (GHz)", 9);
     optRow(sPage, "Overlay Position", 6); optRow(sPage, "Overlay Size", 7);
 
@@ -233,7 +233,7 @@ public class LauncherActivity extends Activity {
       boolean sel = (idx == Array.getInt(optIdx, k)); item.setTextColor(sel ? 0xFFFACC15 : 0xFFF1F5F9); item.setTypeface(sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
       item.setTextSize(TypedValue.COMPLEX_UNIT_PX, spx(12)); item.setPadding(spx(14), spx(8), spx(18), spx(8)); prep(item);
       item.setBackground(focusBg(sel ? 0xFF1E293B : 0xFF141C2B, 0xFF182236, 8, 0, 0xFFF59E0B));
-      item.setOnClickListener(v -> { Array.setInt(optIdx, k, idx); anchor.setText(lbl + " ▾"); savePrefs(); pop.dismiss(); if (k == 1) { buildUi(); return; } refresh(); });
+      item.setOnClickListener(v -> { Array.setInt(optIdx, k, idx); anchor.setText(lbl + " â–¾"); savePrefs(); pop.dismiss(); if (k == 1) { buildUi(); return; } refresh(); });
       menu.addView(item); if (sel) item.post(item::requestFocus);
     }
     menu.measure(View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
@@ -366,7 +366,7 @@ public class LauncherActivity extends Activity {
           if (so == null) throw new IOException("No .so Vulkan driver found");
           try (FileWriter fw = new FileWriter(new File(dd, "vk_icd.json"))) { fw.write("{\"file_format_version\":\"1.0.0\",\"ICD\":{\"library_path\":\"./" + so + "\",\"api_version\":\"1.3.0\"}}"); }
           final String fSo = so;
-          runOnUiThread(() -> { getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("driver_name", fSo).apply(); Array.setInt(optIdx, 8, 5); TextView dv = (TextView) Array.get(optVal, 8); if (dv != null) dv.setText("Custom (.zip) ▾"); savePrefs(); busy(false, "Ready for Launch"); refresh(); });
+          runOnUiThread(() -> { getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("driver_name", fSo).apply(); Array.setInt(optIdx, 8, 5); TextView dv = (TextView) Array.get(optVal, 8); if (dv != null) dv.setText("Custom (.zip) â–¾"); savePrefs(); busy(false, "Ready for Launch"); refresh(); });
         } catch (Exception ex) { final String em = String.valueOf(ex.getMessage()); runOnUiThread(() -> { busy(false, "Ready for Launch"); err("Driver Import Failed", em); }); }
       }).start();
     }
@@ -561,7 +561,7 @@ public class LauncherActivity extends Activity {
         i.putExtra("FOXHOLLOW_MEMORY_CARD", new File(baseDir, "MemoryCardA.USA.raw").getAbsolutePath()); i.putExtra("FOXHOLLOW_AUTOSAVE", new File(baseDir, "autosave.bin").getAbsolutePath());
         i.putExtra("FOXHOLLOW_CACHE_DIR", new File(baseDir, "cache").getAbsolutePath());
         i.putExtra("FOXHOLLOW_HD_TEXTURES", Array.getBoolean(togState, 0) ? "1" : "0"); i.putExtra("FOXHOLLOW_REFLECTIONS", Array.getBoolean(togState, 1) ? "1" : "0");
-        i.putExtra("FOXHOLLOW_HOLD_A", Array.getBoolean(togState, 2) ? "1" : "0"); i.putExtra("FOXHOLLOW_TOUCH_CONTROLS", Array.getBoolean(togState, 10) ? "1" : "0"); i.putExtra("FOXHOLLOW_TOUCH_HAPTICS", Array.getBoolean(togState, 11) ? "1" : "0"); String[] tsc = {"0.85", "1.0", "1.15", "1.30"}; i.putExtra("FOXHOLLOW_TOUCH_SCALE", (String) Array.get(tsc, Array.getInt(optIdx, 9))); i.putExtra("FOXHOLLOW_SHOW_FPS", Array.getBoolean(togState, 3) ? "1" : "0"); i.putExtra("FOXHOLLOW_SHOW_TEMP", Array.getBoolean(togState, 4) ? "1" : "0");
+        i.putExtra("FOXHOLLOW_HOLD_A", Array.getBoolean(togState, 2) ? "1" : "0"); i.putExtra("FOXHOLLOW_TOUCH_CONTROLS", Array.getBoolean(togState, 10) ? "1" : "0"); i.putExtra("FOXHOLLOW_TOUCH_HYBRID", Array.getBoolean(togState, 12) ? "1" : "0");  i.putExtra("FOXHOLLOW_TOUCH_HAPTICS", Array.getBoolean(togState, 11) ? "1" : "0"); String[] tsc = {"0.85", "1.0", "1.15", "1.30"}; i.putExtra("FOXHOLLOW_TOUCH_SCALE", (String) Array.get(tsc, Array.getInt(optIdx, 9))); i.putExtra("FOXHOLLOW_SHOW_FPS", Array.getBoolean(togState, 3) ? "1" : "0"); i.putExtra("FOXHOLLOW_SHOW_TEMP", Array.getBoolean(togState, 4) ? "1" : "0");
         i.putExtra("FOXHOLLOW_SHOW_FRAMETIME", Array.getBoolean(togState, 6) ? "1" : "0"); i.putExtra("FOXHOLLOW_SHOW_BATTERY", Array.getBoolean(togState, 7) ? "1" : "0");
         i.putExtra("FOXHOLLOW_SHOW_RAM", Array.getBoolean(togState, 8) ? "1" : "0"); i.putExtra("FOXHOLLOW_SHOW_CPU_FREQ", Array.getBoolean(togState, 9) ? "1" : "0");
         i.putExtra("FOXHOLLOW_STAT_POS", String.valueOf(Array.getInt(optIdx, 6))); i.putExtra("FOXHOLLOW_STAT_SIZE", String.valueOf(Array.getInt(optIdx, 7)));
@@ -575,41 +575,61 @@ public class LauncherActivity extends Activity {
       });
     }).start();
   }
-  void savePrefs() { SharedPreferences.Editor e = getSharedPreferences(PREFS, MODE_PRIVATE).edit(); for (int k = 0; k < 10; k++) e.putInt("o" + k, Array.getInt(optIdx, k)); for (int t = 0; t < 12; t++) e.putBoolean("t" + t, Array.getBoolean(togState, t)); e.apply(); }
-  void loadPrefs() { SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE); int tier = detectGpuTier(); int[] def = {tier == 2 ? 3 : (tier == 1 ? 4 : 5), 1, 0, tier == 2 ? 1 : (tier == 1 ? 2 : 3), 0, 0, 0, 1, 0, 1}; for (int k = 0; k < 10; k++) { int v = p.getInt("o" + k, Array.getInt(def, k)); Array.setInt(optIdx, k, v); String[] row = (String[]) Array.get(optItems, k); TextView tv = (TextView) Array.get(optVal, k); if (tv != null) tv.setText((String) Array.get(row, v) + " ▾"); } boolean[] tdef = {false, false, false, false, false, false, false, false, false, false, false, true}; for (int t = 0; t < 12; t++) setIosSwitchVisual(t, p.getBoolean("t" + t, Array.getBoolean(tdef, t)), false); }
+  void savePrefs() { SharedPreferences.Editor e = getSharedPreferences(PREFS, MODE_PRIVATE).edit(); for (int k = 0; k < 10; k++) e.putInt("o" + k, Array.getInt(optIdx, k)); for (int t = 0; t < 13; t++) e.putBoolean("t" + t, Array.getBoolean(togState, t)); e.apply(); }
+  void loadPrefs() { SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE); int tier = detectGpuTier(); int[] def = {tier == 2 ? 3 : (tier == 1 ? 4 : 5), 1, 0, tier == 2 ? 1 : (tier == 1 ? 2 : 3), 0, 0, 0, 1, 0, 1}; for (int k = 0; k < 10; k++) { int v = p.getInt("o" + k, Array.getInt(def, k)); Array.setInt(optIdx, k, v); String[] row = (String[]) Array.get(optItems, k); TextView tv = (TextView) Array.get(optVal, k); if (tv != null) tv.setText((String) Array.get(row, v) + " â–¾"); } boolean[] tdef = {false, false, false, false, false, false, false, false, false, false, false, true, false}; for (int t = 0; t < 13; t++) setIosSwitchVisual(t, p.getBoolean("t" + t, Array.getBoolean(tdef, t)), false); }
   void busy(boolean b, String m) { if (progTxt != null) progTxt.setText(m); }
   void err(String t, String m) { new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle(t).setMessage(m).setPositiveButton("OK", null).show(); }
   void del(File f) { if (f.isDirectory()) { File[] c = f.listFiles(); if (c != null) for (File x : c) del(x); } f.delete(); }
 
-  void openTouchLayoutEditor() {
+    void openTouchLayoutEditor() {
     float d = getResources().getDisplayMetrics().density;
     Dialog dlg = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
     FrameLayout root = new FrameLayout(this); root.setBackgroundColor(0xFF070B14);
-    View grid = new View(this) {
-      final Paint gp = new Paint(Paint.ANTI_ALIAS_FLAG);
-      @Override protected void onDraw(Canvas c) {
-        int w = getWidth(), h = getHeight(); gp.setStyle(Paint.Style.STROKE); gp.setStrokeWidth(d); gp.setColor(0x1894A3B8);
-        for (int x = 0; x < w; x += Math.round(32f*d)) c.drawLine(x, 0, x, h, gp);
-        for (int y = 0; y < h; y += Math.round(32f*d)) c.drawLine(0, y, w, y, gp);
-        int w43 = Math.min(w, Math.round(h * 4f / 3f)); gp.setColor(0x3338BDF8);
-        c.drawRect((w - w43) * 0.5f, 4f*d, (w + w43) * 0.5f, h - 4f*d, gp);
-      }
-    };
+    View grid = new View(this) { final Paint gp = new Paint(Paint.ANTI_ALIAS_FLAG); @Override protected void onDraw(Canvas c) { int w=getWidth(),h=getHeight(); gp.setStyle(Paint.Style.STROKE); gp.setStrokeWidth(d); gp.setColor(0x1894A3B8); for(int x=0;x<w;x+=Math.round(32f*d))c.drawLine(x,0,x,h,gp); for(int y=0;y<h;y+=Math.round(32f*d))c.drawLine(0,y,w,y,gp); int w43=Math.min(w,Math.round(h*4f/3f)); gp.setColor(0x3338BDF8); c.drawRect((w-w43)*0.5f,4f*d,(w+w43)*0.5f,h-4f*d,gp); } };
     root.addView(grid, new FrameLayout.LayoutParams(-1, -1));
-    String[] tsc = {"0.85", "1.0", "1.15", "1.30"}; float sc = 1.0f;
-    try { sc = Float.parseFloat((String) Array.get(tsc, Array.getInt(optIdx, 9))); } catch (Throwable ignored) {}
-    FoxhollowActivity.GcTouchView tv = new FoxhollowActivity.GcTouchView(this, getSharedPreferences("fh_touch_cfg", MODE_PRIVATE), Array.getBoolean(togState, 11), sc);
+    FoxhollowActivity.GcTouchView tv = new FoxhollowActivity.GcTouchView(this, getSharedPreferences("fh_touch_cfg", MODE_PRIVATE), Array.getBoolean(togState, 11), 1.0f);
     tv.editMode = true; root.addView(tv, new FrameLayout.LayoutParams(-1, -1));
-    LinearLayout bar = new LinearLayout(this); bar.setOrientation(LinearLayout.HORIZONTAL); bar.setGravity(Gravity.CENTER_VERTICAL);
-    bar.setBackground(boxBg(0xE60F172A, 0xE60B111E, 99, 1.2f, 0xFF334155)); bar.setPadding(Math.round(10f*d), Math.round(4f*d), Math.round(10f*d), Math.round(4f*d));
-    TextView opBtn = new TextView(this); opBtn.setText("OPACITY " + Math.round(tv.uiAlpha*100f) + "%"); opBtn.setTextColor(0xFFE2E8F0); opBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f); opBtn.setTypeface(Typeface.DEFAULT_BOLD); opBtn.setPadding(Math.round(8f*d), Math.round(4f*d), Math.round(8f*d), Math.round(4f*d));
-    opBtn.setOnClickListener(v -> { tv.cycleAlpha(); opBtn.setText("OPACITY " + Math.round(tv.uiAlpha*100f) + "%"); });
-    TextView rsBtn = new TextView(this); rsBtn.setText("RESET"); rsBtn.setTextColor(0xFFF87171); rsBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f); rsBtn.setTypeface(Typeface.DEFAULT_BOLD); rsBtn.setPadding(Math.round(8f*d), Math.round(4f*d), Math.round(8f*d), Math.round(4f*d));
-    rsBtn.setOnClickListener(v -> { tv.resetLayoutToDefault(); Toast.makeText(this, "Reset to default", Toast.LENGTH_SHORT).show(); });
-    TextView svBtn = new TextView(this); svBtn.setText("SAVE & CLOSE"); svBtn.setTextColor(0xFF34D399); svBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f); svBtn.setTypeface(Typeface.DEFAULT_BOLD); svBtn.setPadding(Math.round(10f*d), Math.round(4f*d), Math.round(8f*d), Math.round(4f*d));
-    svBtn.setOnClickListener(v -> { tv.saveLayout(); Toast.makeText(this, "Custom touch layout saved", Toast.LENGTH_SHORT).show(); dlg.dismiss(); });
-    bar.addView(opBtn); bar.addView(rsBtn); bar.addView(svBtn);
-    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL); lp.topMargin = Math.round(10f*d);
-    root.addView(bar, lp); dlg.setContentView(root); dlg.show();
+    String[] names = {"Left Stick", "C-Stick", "D-Pad", "A", "B", "X", "Y", "L", "R", "Z", "Start"};
+    LinearLayout panel = new LinearLayout(this); panel.setOrientation(LinearLayout.VERTICAL); panel.setBackground(boxBg(0xEB0F172A, 0xEB090D16, 12, 1.2f, 0xFF334155)); panel.setPadding(Math.round(12f*d), Math.round(7f*d), Math.round(12f*d), Math.round(7f*d));
+    LinearLayout r1 = new LinearLayout(this); r1.setOrientation(LinearLayout.HORIZONTAL); r1.setGravity(Gravity.CENTER_VERTICAL);
+    TextView scLbl = new TextView(this); scLbl.setTextColor(0xFFFACC15); scLbl.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f); scLbl.setTypeface(Typeface.DEFAULT_BOLD); scLbl.setMinWidth(Math.round(112f*d));
+    SeekBar scBar = new SeekBar(this); scBar.setMax(210);
+    scBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+      @Override public void onProgressChanged(SeekBar b, int p, boolean u) { float sc = (40 + p) / 100f; if (u) tv.setSelScale(sc); scLbl.setText((String) Array.get(names, tv.selIdx) + " Size: " + (40 + p) + "%"); }
+      @Override public void onStartTrackingTouch(SeekBar b) {} @Override public void onStopTrackingTouch(SeekBar b) {}
+    });
+    tv.onSel = () -> { int pct = Math.round(Array.getFloat(tv.itemSc, tv.selIdx) * 100f); scBar.setProgress(Math.max(0, Math.min(210, pct - 40))); scLbl.setText((String) Array.get(names, tv.selIdx) + " Size: " + pct + "%"); };
+    tv.onSel.run();
+    r1.addView(scLbl); r1.addView(scBar, new LinearLayout.LayoutParams(Math.round(145f*d), -2));
+    LinearLayout r2 = new LinearLayout(this); r2.setOrientation(LinearLayout.HORIZONTAL); r2.setGravity(Gravity.CENTER_VERTICAL);
+    TextView opLbl = new TextView(this); opLbl.setText("Opacity: " + Math.round(tv.uiAlpha*100f) + "%"); opLbl.setTextColor(0xFFE2E8F0); opLbl.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f); opLbl.setTypeface(Typeface.DEFAULT_BOLD); opLbl.setMinWidth(Math.round(112f*d));
+    SeekBar opBar = new SeekBar(this); opBar.setMax(80); opBar.setProgress(Math.max(0, Math.min(80, Math.round(tv.uiAlpha*100f) - 20)));
+    opBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+      @Override public void onProgressChanged(SeekBar b, int p, boolean u) { if (u) { tv.uiAlpha = (20 + p) / 100f; tv.prefs.edit().putFloat("alpha", tv.uiAlpha).apply(); tv.invalidate(); } opLbl.setText("Opacity: " + (20 + p) + "%"); }
+      @Override public void onStartTrackingTouch(SeekBar b) {} @Override public void onStopTrackingTouch(SeekBar b) {}
+    });
+    TextView rs = new TextView(this); rs.setText("RESET"); rs.setTextColor(0xFFF87171); rs.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f); rs.setTypeface(Typeface.DEFAULT_BOLD); rs.setPadding(Math.round(10f*d), Math.round(4f*d), Math.round(8f*d), Math.round(4f*d));
+    rs.setOnClickListener(v -> { tv.resetLayoutToDefault(); tv.onSel.run(); Toast.makeText(this, "Reset to default", Toast.LENGTH_SHORT).show(); });
+    TextView sv = new TextView(this); sv.setText("SAVE"); sv.setTextColor(0xFF34D399); sv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f); sv.setTypeface(Typeface.DEFAULT_BOLD); sv.setPadding(Math.round(8f*d), Math.round(4f*d), Math.round(4f*d), Math.round(4f*d));
+    sv.setOnClickListener(v -> { tv.saveLayout(); Toast.makeText(this, "Custom layout saved", Toast.LENGTH_SHORT).show(); dlg.dismiss(); });
+    r2.addView(opLbl); r2.addView(opBar, new LinearLayout.LayoutParams(Math.round(115f*d), -2)); r2.addView(rs); r2.addView(sv);
+    panel.addView(r1); panel.addView(r2);
+    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL); lp.topMargin = Math.round(8f*d);
+    root.addView(panel, lp); dlg.setContentView(root); dlg.show();
   }
+  final String[] gcLbl = {"A", "B", "X", "Y", "L", "R", "Z", "Start", "Up", "Down", "Left", "Right"};
+  final int[] defXbox = {96, 97, 99, 100, 102, 103, 105, 108, 19, 20, 21, 22};
+  final int[] defSwitch = {97, 96, 100, 99, 102, 103, 105, 108, 19, 20, 21, 22};
+  final TextView[] bindTxt = (TextView[]) Array.newInstance(TextView.class, 12);
+  int detectPadType() { for (int id : InputDevice.getDeviceIds()) { InputDevice d = InputDevice.getDevice(id); if (d == null) continue; int sr = d.getSources(); if ((sr & 0x401) == 0 && (sr & 0x1000010) == 0) continue; String n = d.getName() != null ? d.getName().toLowerCase() : ""; int v = d.getVendorId(); if (v == 0x057E || n.contains("nintendo") || n.contains("switch") || n.contains("joy-con") || n.contains("pro controller")) return 3; if (v == 0x054C || n.contains("sony") || n.contains("playstation") || n.contains("dualsense") || n.contains("dualshock")) return 2; } return 1; }
+  int activePadType(SharedPreferences sp) { int m = sp.getInt("pad_prof", 0); return m == 0 ? detectPadType() : m; }
+  int[] activeDefaults(SharedPreferences sp) { return activePadType(sp) == 3 ? defSwitch : defXbox; }
+  String profLabel(SharedPreferences sp) { int m = sp.getInt("pad_prof", 0), d = detectPadType(); String dn = d == 3 ? "Switch" : (d == 2 ? "PlayStation" : "Xbox"); return m == 0 ? ("Auto (" + dn + ")") : (m == 3 ? "Nintendo Switch" : (m == 2 ? "PlayStation" : "Xbox / Standard")); }
+  String kcName(int kc, int pt) { if (kc == -102) return pt == 2 ? "L2 Trigger" : (pt == 3 ? "ZL Trigger" : "Trigger L2"); if (kc == -103) return pt == 2 ? "R2 Trigger" : (pt == 3 ? "ZR Trigger" : "Trigger R2"); if (kc <= 0) return "Unbound"; if (pt == 2) { if (kc == 96) return "Cross (\u2715)"; if (kc == 97) return "Circle (\u25CB)"; if (kc == 99) return "Square (\u25A1)"; if (kc == 100) return "Triangle (\u25B3)"; if (kc == 102) return "L1"; if (kc == 103) return "R1"; if (kc == 105) return "R2"; if (kc == 108) return "Options"; } if (pt == 3) { if (kc == 97) return "B (Bottom)"; if (kc == 96) return "A (Right)"; if (kc == 100) return "Y (Left)"; if (kc == 99) return "X (Top)"; if (kc == 102) return "L"; if (kc == 103) return "R"; if (kc == 105) return "ZR"; if (kc == 108) return "Plus (+)"; } return KeyEvent.keyCodeToString(kc).replace("KEYCODE_BUTTON_", "Button ").replace("KEYCODE_DPAD_", "D-Pad ").replace("KEYCODE_", ""); }
+  void applyProfileDefaults(SharedPreferences sp) { int[] defs = activeDefaults(sp); int pt = activePadType(sp); SharedPreferences.Editor e = sp.edit().putBoolean("kc_custom", pt == 3); for (int k = 0; k < 12; k++) { int dk = Array.getInt(defs, k); e.putInt("kc_" + k, dk); TextView tv = (TextView) Array.get(bindTxt, k); if (tv != null) tv.setText(kcName(dk, pt)); } e.apply(); }
+  void secHdr(LinearLayout p, String t, boolean g) { TextView h = new TextView(this); h.setText(t); h.setTextColor(0xFF94A3B8); h.setTextSize(TypedValue.COMPLEX_UNIT_PX, spx(9.5f)); h.setTypeface(Typeface.DEFAULT_BOLD); h.setLetterSpacing(0.08f); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(spx(4), g ? spx(8) : spx(2), 0, spx(5)); p.addView(h, lp); }
+  void actionRow(LinearLayout p, String l, String tag, int col, Runnable fn) { LinearLayout r = new LinearLayout(this); r.setOrientation(LinearLayout.HORIZONTAL); r.setGravity(Gravity.CENTER_VERTICAL); prep(r); r.setBackground(focusBg(0xFF121826, 0xFF0E131F, 10, 0xFF1F2A40, 0xFFF59E0B)); r.setPadding(spx(12), spx(7), spx(12), spx(7)); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 0, 0, spx(5)); TextView tk = new TextView(this); tk.setText(l); tk.setTextColor(0xFFF1F5F9); tk.setTextSize(TypedValue.COMPLEX_UNIT_PX, spx(11.5f)); tk.setTypeface(Typeface.DEFAULT_BOLD); tk.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f)); TextView tv = new TextView(this); tv.setText(tag); tv.setTextColor(col); tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, spx(11.5f)); tv.setTypeface(Typeface.DEFAULT_BOLD); r.setOnClickListener(w -> fn.run()); r.addView(tk); r.addView(tv); p.addView(r, lp); }
+  void bindRow(LinearLayout p, final int slot, final SharedPreferences sp) { int[] defs = activeDefaults(sp); int pt = activePadType(sp); int kc = sp.getInt("kc_" + slot, Array.getInt(defs, slot)); LinearLayout r = new LinearLayout(this); r.setOrientation(LinearLayout.HORIZONTAL); r.setGravity(Gravity.CENTER_VERTICAL); prep(r); r.setBackground(focusBg(0xFF121826, 0xFF0E131F, 10, 0xFF1F2A40, 0xFFF59E0B)); r.setPadding(spx(12), spx(7), spx(12), spx(7)); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 0, 0, spx(5)); TextView tk = new TextView(this); tk.setText((String) Array.get(gcLbl, slot)); tk.setTextColor(0xFFF1F5F9); tk.setTextSize(TypedValue.COMPLEX_UNIT_PX, spx(11.5f)); tk.setTypeface(Typeface.DEFAULT_BOLD); tk.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f)); TextView tv = new TextView(this); tv.setText(kcName(kc, pt)); tv.setTextColor(0xFFFACC15); tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, spx(11.5f)); tv.setTypeface(Typeface.DEFAULT_BOLD); Array.set(bindTxt, slot, tv); r.setOnClickListener(w -> promptBind(slot, sp)); r.addView(tk); r.addView(tv); p.addView(r, lp); }
+  void promptBind(int slot, SharedPreferences sp) { int pt = activePadType(sp); Dialog d = new Dialog(this) { void bc(int kc) { sp.edit().putInt("kc_" + slot, kc).putBoolean("kc_custom", true).apply(); TextView tv = (TextView) Array.get(bindTxt, slot); if (tv != null) tv.setText(kcName(kc, pt)); dismiss(); } @Override public boolean dispatchKeyEvent(KeyEvent e) { if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) bc(e.getKeyCode()); return true; } @Override public boolean dispatchGenericMotionEvent(MotionEvent e) { float l2 = Math.max(e.getAxisValue(MotionEvent.AXIS_LTRIGGER), e.getAxisValue(MotionEvent.AXIS_BRAKE)), r2 = Math.max(e.getAxisValue(MotionEvent.AXIS_RTRIGGER), e.getAxisValue(MotionEvent.AXIS_GAS)); if (l2 > 0.55f) { bc(-102); return true; } if (r2 > 0.55f) { bc(-103); return true; } return super.dispatchGenericMotionEvent(e); } }; d.requestWindowFeature(Window.FEATURE_NO_TITLE); d.setCancelable(false); LinearLayout box = new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL); box.setPadding(spx(22), spx(18), spx(22), spx(14)); box.setBackground(boxBg(0xFF121826, 0xFF0E131F, 12, 1.5f, 0xFFF59E0B)); TextView t1 = new TextView(this); t1.setText((String) Array.get(gcLbl, slot)); t1.setTextColor(0xFFFACC15); t1.setTextSize(TypedValue.COMPLEX_UNIT_PX, spx(15)); t1.setTypeface(Typeface.DEFAULT_BOLD); box.addView(t1); TextView t2 = new TextView(this); t2.setText("Waiting for input..."); t2.setTextColor(0xFFE2E8F0); t2.setTextSize(TypedValue.COMPLEX_UNIT_PX, spx(12)); t2.setPadding(0, spx(8), 0, spx(16)); box.addView(t2); LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL); row.setGravity(Gravity.END); TextView clr = new TextView(this); clr.setText("CLEAR"); clr.setTextColor(0xFFF87171); clr.setTextSize(TypedValue.COMPLEX_UNIT_PX, spx(11)); clr.setTypeface(Typeface.DEFAULT_BOLD); clr.setPadding(spx(12), spx(6), spx(12), spx(6)); clr.setFocusable(false); clr.setOnClickListener(v -> { sp.edit().putInt("kc_" + slot, -1).putBoolean("kc_custom", true).apply(); TextView tv = (TextView) Array.get(bindTxt, slot); if (tv != null) tv.setText("Unbound"); d.dismiss(); }); TextView cnl = new TextView(this); cnl.setText("CANCEL"); cnl.setTextColor(0xFF94A3B8); cnl.setTextSize(TypedValue.COMPLEX_UNIT_PX, spx(11)); cnl.setTypeface(Typeface.DEFAULT_BOLD); cnl.setPadding(spx(12), spx(6), spx(4), spx(6)); cnl.setFocusable(false); cnl.setOnClickListener(v -> d.dismiss()); row.addView(clr); row.addView(cnl); box.addView(row, new LinearLayout.LayoutParams(-1, -2)); d.setContentView(box); d.show(); }
+  void buildControlsTab(LinearLayout p) { SharedPreferences sp = getSharedPreferences(PREFS, MODE_PRIVATE); if (!sp.getBoolean("kc_custom", false) && activePadType(sp) == 3) applyProfileDefaults(sp); secHdr(p, "ON-SCREEN TOUCH", false); iosSwitchRow(p, "On-Screen Touch Controls", 10); iosSwitchRow(p, "Touch Haptic Vibration", 11); iosSwitchRow(p, "Keep Touch With Controller (Accessibility)", 12); actionRow(p, "Set Custom Touch Layout & Size", "Edit \u203A", 0xFF34D399, () -> openTouchLayoutEditor()); actionRow(p, "Reset Touch Layout & Sizes", "Reset \u203A", 0xFF94A3B8, () -> { getSharedPreferences("fh_touch_cfg", MODE_PRIVATE).edit().clear().apply(); Toast.makeText(this, "Touch layout & sizes reset", Toast.LENGTH_SHORT).show(); }); secHdr(p, "CONTROLLER PROFILE", true); LinearLayout pr = new LinearLayout(this); pr.setOrientation(LinearLayout.HORIZONTAL); pr.setGravity(Gravity.CENTER_VERTICAL); prep(pr); pr.setBackground(focusBg(0xFF121826, 0xFF0E131F, 10, 0xFF1F2A40, 0xFFF59E0B)); pr.setPadding(spx(12), spx(7), spx(12), spx(7)); LinearLayout.LayoutParams lpPr = new LinearLayout.LayoutParams(-1, -2); lpPr.setMargins(0, 0, 0, spx(5)); TextView pk = new TextView(this); pk.setText("Controller Button Layout"); pk.setTextColor(0xFFF1F5F9); pk.setTextSize(TypedValue.COMPLEX_UNIT_PX, spx(11.5f)); pk.setTypeface(Typeface.DEFAULT_BOLD); pk.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f)); TextView pv = new TextView(this); pv.setText(profLabel(sp) + " \u25BE"); pv.setTextColor(0xFF38BDF8); pv.setTextSize(TypedValue.COMPLEX_UNIT_PX, spx(11.5f)); pv.setTypeface(Typeface.DEFAULT_BOLD); pr.setOnClickListener(w -> { sp.edit().putInt("pad_prof", (sp.getInt("pad_prof", 0) + 1) % 4).apply(); pv.setText(profLabel(sp) + " \u25BE"); applyProfileDefaults(sp); }); pr.addView(pk); pr.addView(pv); p.addView(pr, lpPr); secHdr(p, "BUTTONS", true); for (int idx : new int[]{0, 1, 2, 3, 6, 7}) bindRow(p, idx, sp); secHdr(p, "TRIGGERS", true); for (int idx : new int[]{4, 5}) bindRow(p, idx, sp); secHdr(p, "D-PAD", true); for (int idx : new int[]{8, 9, 10, 11}) bindRow(p, idx, sp); secHdr(p, "DEFAULTS", true); actionRow(p, "Reset Controller Mapping", "Default \u203A", 0xFFF87171, () -> { applyProfileDefaults(sp); Toast.makeText(this, "Reset to " + profLabel(sp), Toast.LENGTH_SHORT).show(); }); }
 }

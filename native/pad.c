@@ -12,6 +12,9 @@
 #include <jni.h>
 #include <stdatomic.h>
 static _Atomic uint64_t gFhTouchPacked = 0;
+static _Atomic uint32_t gFhPhysMask = 0; static _Atomic int gFhPhysCustom = 0;
+JNIEXPORT void JNICALL Java_dev_foxhollow_android_FoxhollowActivity_nativeSetPhysPad(JNIEnv* e, jclass c, jint m, jint en){(void)e;(void)c;atomic_store_explicit(&gFhPhysMask,(uint32_t)m,memory_order_relaxed);atomic_store_explicit(&gFhPhysCustom,(int)en,memory_order_relaxed);}
+
 JNIEXPORT void JNICALL Java_dev_foxhollow_android_FoxhollowActivity_nativeSetTouchPad(JNIEnv* e, jclass c, jlong v){(void)e;(void)c;atomic_store_explicit(&gFhTouchPacked,(uint64_t)v,memory_order_relaxed);}
 static inline void fhTouchMerge(PADStatus* d){uint64_t t=atomic_load_explicit(&gFhTouchPacked,memory_order_relaxed);if(!t||!d)return;d->err=0;d->button|=(u16)(t&0xFFFFu);s8 sx=(s8)(t>>16),sy=(s8)(t>>24),cx=(s8)(t>>32),cy=(s8)(t>>40);u8 tl=(u8)(t>>48),tr=(u8)(t>>56);if((sx<0?-sx:sx)>(d->stickX<0?-d->stickX:d->stickX))d->stickX=sx;if((sy<0?-sy:sy)>(d->stickY<0?-d->stickY:d->stickY))d->stickY=sy;if((cx<0?-cx:cx)>(d->substickX<0?-d->substickX:d->substickX))d->substickX=cx;if((cy<0?-cy:cy)>(d->substickY<0?-d->substickY:d->substickY))d->substickY=cy;if(tl>d->triggerLeft)d->triggerLeft=tl;if(tr>d->triggerRight)d->triggerRight=tr;}
 #endif
@@ -25,6 +28,27 @@ static int gFhInputReplayEnded;
 
 static const u8 gFhInputTraceHeader[8] = {'F', 'H', 'P', 'A', 'D', 1, sizeof(PADStatus), 4};
 
+static void fhRemapPhysicalPad(PADStatus* d) {
+    static int inited = 0, active = 0;
+    static u16 dst[8] = {0x0100,0x0200,0x0400,0x0800,0x0040,0x0020,0x0010,0x1000};
+    static const u16 src[8] = {0x0100,0x0200,0x0400,0x0800,0x0040,0x0020,0x0010,0x1000};
+    if (!inited) {
+        inited = 1;
+        const char* env = getenv("FOXHOLLOW_BTN_REMAP");
+        if (env && env[0]) {
+            unsigned int v[8];
+            if (sscanf(env, "%x,%x,%x,%x,%x,%x,%x,%x", &v[0],&v[1],&v[2],&v[3],&v[4],&v[5],&v[6],&v[7]) == 8) {
+                for (int k = 0; k < 8; k++) { dst[k] = (u16)v[k]; if (dst[k] != src[k]) active = 1; }
+            }
+        }
+    }
+    if (!active || !d) return;
+    u16 orig = d->button, mapped = orig & ~(0x0100|0x0200|0x0400|0x0800|0x0040|0x0020|0x0010|0x1000);
+    for (int k = 0; k < 8; k++) { if (orig & src[k]) mapped |= dst[k]; }
+    d->button = mapped;
+    if (mapped & 0x0040) { if (d->triggerLeft < 255) d->triggerLeft = 255; } else if (orig & 0x0040) d->triggerLeft = 0;
+    if (mapped & 0x0020) { if (d->triggerRight < 255) d->triggerRight = 255; } else if (orig & 0x0020) d->triggerRight = 0;
+}
 static void fhInputTraceInit(void) {
     const char* recordPath;
     const char* replayPath;
@@ -380,6 +404,7 @@ void padUpdate(void) {
         return;
     }
     fhInputTraceReplay(readPad);
+    if (atomic_load_explicit(&gFhPhysCustom, memory_order_relaxed)) { uint32_t pm = atomic_load_explicit(&gFhPhysMask, memory_order_relaxed); readPad->err = 0; readPad->button = (u16)(pm & 0xFFFFu); if (pm & 0x0040) readPad->triggerLeft = 255; if (pm & 0x0020) readPad->triggerRight = 255; }
 #ifdef __ANDROID__
     fhTouchMerge(readPad);
 #endif

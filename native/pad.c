@@ -8,6 +8,14 @@
 
 #include "dolphin/pad.h"
 #include "string.h"
+#ifdef __ANDROID__
+#include <jni.h>
+#include <stdatomic.h>
+static _Atomic uint64_t gFhTouchPacked = 0;
+JNIEXPORT void JNICALL Java_dev_foxhollow_android_FoxhollowActivity_nativeSetTouchPad(JNIEnv* e, jclass c, jlong v){(void)e;(void)c;atomic_store_explicit(&gFhTouchPacked,(uint64_t)v,memory_order_relaxed);}
+static inline void fhTouchMerge(PADStatus* d){uint64_t t=atomic_load_explicit(&gFhTouchPacked,memory_order_relaxed);if(!t||!d)return;d->err=0;d->button|=(u16)(t&0xFFFFu);s8 sx=(s8)(t>>16),sy=(s8)(t>>24),cx=(s8)(t>>32),cy=(s8)(t>>40);u8 tl=(u8)(t>>48),tr=(u8)(t>>56);if((sx<0?-sx:sx)>(d->stickX<0?-d->stickX:d->stickX))d->stickX=sx;if((sy<0?-sy:sy)>(d->stickY<0?-d->stickY:d->stickY))d->stickY=sy;if((cx<0?-cx:cx)>(d->substickX<0?-d->substickX:d->substickX))d->substickX=cx;if((cy<0?-cy:cy)>(d->substickY<0?-d->substickY:d->substickY))d->substickY=cy;if(tl>d->triggerLeft)d->triggerLeft=tl;if(tr>d->triggerRight)d->triggerRight=tr;}
+#endif
+
 
 static FILE* gFhInputRecordFile;
 static FILE* gFhInputReplayFile;
@@ -372,6 +380,9 @@ void padUpdate(void) {
         return;
     }
     fhInputTraceReplay(readPad);
+#ifdef __ANDROID__
+    fhTouchMerge(readPad);
+#endif
     PADClamp(readPad);
     fhInputTraceRecord(readPad);
     if (rumbleEnabled != 0) {

@@ -964,7 +964,7 @@ u8* loadObjectFile(int id) {
     int n;
     s16 modLine;
 
-    if (id >= gObjFileCount) {
+    if (id < 0 || id >= gObjFileCount) {
         return 0;
     }
     if (gObjFileRefCount[id] != 0) {
@@ -1635,7 +1635,7 @@ void* loadCharacter(s16* data, int flags, int arg2, int arg3, void* parent, int 
     if (flags & 2) {
         id = seq;
     } else {
-        if (seq > gObjSeqToObjIdMax) {
+        if (seq < 0 || seq > gObjSeqToObjIdMax) {
             fprintf(stderr, "[obj] seq %d > max %d\n", seq, gObjSeqToObjIdMax);
             return NULL;
         }

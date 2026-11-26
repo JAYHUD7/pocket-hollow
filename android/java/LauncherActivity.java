@@ -9,12 +9,12 @@ public class LauncherActivity extends Activity {
   FrameLayout progBar; View progFill; Button playBtn; int curTab = 0; float scaleH = 1f; String detectedGpu = ""; volatile boolean hdDownloading = false;
   final TextView[] tabBtns = (TextView[]) Array.newInstance(TextView.class, 3);
   final View[] tabPages = (View[]) Array.newInstance(View.class, 4);
-  final String[] optLabels = {"Resolution Scale", "Aspect Ratio", "V-Sync", "Anisotropic", "Graphics API", "Language", "Overlay Position", "Overlay Size", "Driver Mode"};
-  final String[][] optItems = {{"4.0x (2160p)", "3.0x (1440p)", "2.5x", "2.0x (1080p)", "1.5x", "1.0x (Native)"}, {"Widescreen (16:9)", "Original (4:3)"}, {"Enabled", "Disabled"}, {"16x", "8x", "4x", "2x", "1x"}, {"Vulkan", "OpenGL ES"}, {"English", "Francais", "Deutsch", "Italiano", "Espanol"}, {"Top-Left", "Top-Right", "Bottom-Left", "Bottom-Right"}, {"Compact", "Medium", "Large"}, {"Auto (Recommended)", "Bundled Turnip (A6xx/A7xx)", "Bundled Turnip (A8xx)", "Bundled Qualcomm (v840)", "System Default", "Custom (.zip)"}};
-  final int[] optIdx = {4, 1, 0, 2, 0, 0, 0, 1, 0}; final TextView[] optVal = (TextView[]) Array.newInstance(TextView.class, 9);
-  final boolean[] togState = {false, false, false, false, false, false, false, false, false, false};
-  final FrameLayout[] togTrack = (FrameLayout[]) Array.newInstance(FrameLayout.class, 10);
-  final View[] togThumb = (View[]) Array.newInstance(View.class, 10);
+  final String[] optLabels = {"Resolution Scale", "Aspect Ratio", "V-Sync", "Anisotropic", "Graphics API", "Language", "Overlay Position", "Overlay Size", "Driver Mode", "Touch Control Scale"};
+  final String[][] optItems = {{"4.0x (2160p)", "3.0x (1440p)", "2.5x", "2.0x (1080p)", "1.5x", "1.0x (Native)"}, {"Widescreen (16:9)", "Original (4:3)"}, {"Enabled", "Disabled"}, {"16x", "8x", "4x", "2x", "1x"}, {"Vulkan", "OpenGL ES"}, {"English", "Francais", "Deutsch", "Italiano", "Espanol"}, {"Top-Left", "Top-Right", "Bottom-Left", "Bottom-Right"}, {"Compact", "Medium", "Large"}, {"Auto (Recommended)", "Bundled Turnip (A6xx/A7xx)", "Bundled Turnip (A8xx)", "Bundled Qualcomm (v840)", "System Default", "Custom (.zip)"}, {"85% (Compact)", "100% (Standard)", "115% (Large)", "130% (XL)"}};
+  final int[] optIdx = {4, 1, 0, 2, 0, 0, 0, 1, 0, 1}; final TextView[] optVal = (TextView[]) Array.newInstance(TextView.class, 10);
+  final boolean[] togState = {false, false, false, false, false, false, false, false, false, false, false, true};
+  final FrameLayout[] togTrack = (FrameLayout[]) Array.newInstance(FrameLayout.class, 12);
+  final View[] togThumb = (View[]) Array.newInstance(View.class, 12);
 
   int spx(float baseDp) { return Math.max(1, Math.round(baseDp * getResources().getDisplayMetrics().density * scaleH)); }
   GradientDrawable boxBg(int top, int bot, float radDp, float sw, int sc) {
@@ -191,7 +191,7 @@ public class LauncherActivity extends Activity {
     optRow(gPage, "Anisotropic", 3); optRow(gPage, "Language", 5);
 
     LinearLayout mPage = makeTabPage(pageHost, 2);
-    iosSwitchRow(mPage, "HD Texture Pack (4x)", 0); iosSwitchRow(mPage, "Water Reflections", 1); iosSwitchRow(mPage, "Hold-A Auto-Mash", 2);
+    iosSwitchRow(mPage, "HD Texture Pack (4x)", 0); iosSwitchRow(mPage, "Water Reflections", 1); iosSwitchRow(mPage, "Hold-A Auto-Mash", 2); iosSwitchRow(mPage, "On-Screen Touch Controls", 10); iosSwitchRow(mPage, "Touch Haptic Vibration", 11); optRow(mPage, "Touch Control Scale", 9); Button editLytBtn = secBtn("Set Custom Touch Layout"); editLytBtn.setOnClickListener(v -> openTouchLayoutEditor()); mPage.addView(editLytBtn); Button rstBtn = secBtn("Reset Custom Touch Layout"); rstBtn.setOnClickListener(v -> { getSharedPreferences("fh_touch_cfg", MODE_PRIVATE).edit().clear().apply(); Toast.makeText(this, "Touch layout reset to default", Toast.LENGTH_SHORT).show(); }); mPage.addView(rstBtn);
 
     LinearLayout sPage = makeTabPage(pageHost, 3);
     iosSwitchRow(sPage, "FPS Counter", 3); iosSwitchRow(sPage, "Frame Time (ms)", 6); iosSwitchRow(sPage, "CPU / SoC Temp (°C)", 4);
@@ -561,7 +561,7 @@ public class LauncherActivity extends Activity {
         i.putExtra("FOXHOLLOW_MEMORY_CARD", new File(baseDir, "MemoryCardA.USA.raw").getAbsolutePath()); i.putExtra("FOXHOLLOW_AUTOSAVE", new File(baseDir, "autosave.bin").getAbsolutePath());
         i.putExtra("FOXHOLLOW_CACHE_DIR", new File(baseDir, "cache").getAbsolutePath());
         i.putExtra("FOXHOLLOW_HD_TEXTURES", Array.getBoolean(togState, 0) ? "1" : "0"); i.putExtra("FOXHOLLOW_REFLECTIONS", Array.getBoolean(togState, 1) ? "1" : "0");
-        i.putExtra("FOXHOLLOW_HOLD_A", Array.getBoolean(togState, 2) ? "1" : "0"); i.putExtra("FOXHOLLOW_SHOW_FPS", Array.getBoolean(togState, 3) ? "1" : "0"); i.putExtra("FOXHOLLOW_SHOW_TEMP", Array.getBoolean(togState, 4) ? "1" : "0");
+        i.putExtra("FOXHOLLOW_HOLD_A", Array.getBoolean(togState, 2) ? "1" : "0"); i.putExtra("FOXHOLLOW_TOUCH_CONTROLS", Array.getBoolean(togState, 10) ? "1" : "0"); i.putExtra("FOXHOLLOW_TOUCH_HAPTICS", Array.getBoolean(togState, 11) ? "1" : "0"); String[] tsc = {"0.85", "1.0", "1.15", "1.30"}; i.putExtra("FOXHOLLOW_TOUCH_SCALE", (String) Array.get(tsc, Array.getInt(optIdx, 9))); i.putExtra("FOXHOLLOW_SHOW_FPS", Array.getBoolean(togState, 3) ? "1" : "0"); i.putExtra("FOXHOLLOW_SHOW_TEMP", Array.getBoolean(togState, 4) ? "1" : "0");
         i.putExtra("FOXHOLLOW_SHOW_FRAMETIME", Array.getBoolean(togState, 6) ? "1" : "0"); i.putExtra("FOXHOLLOW_SHOW_BATTERY", Array.getBoolean(togState, 7) ? "1" : "0");
         i.putExtra("FOXHOLLOW_SHOW_RAM", Array.getBoolean(togState, 8) ? "1" : "0"); i.putExtra("FOXHOLLOW_SHOW_CPU_FREQ", Array.getBoolean(togState, 9) ? "1" : "0");
         i.putExtra("FOXHOLLOW_STAT_POS", String.valueOf(Array.getInt(optIdx, 6))); i.putExtra("FOXHOLLOW_STAT_SIZE", String.valueOf(Array.getInt(optIdx, 7)));
@@ -575,9 +575,41 @@ public class LauncherActivity extends Activity {
       });
     }).start();
   }
-  void savePrefs() { SharedPreferences.Editor e = getSharedPreferences(PREFS, MODE_PRIVATE).edit(); for (int k = 0; k < 9; k++) e.putInt("o" + k, Array.getInt(optIdx, k)); for (int t = 0; t < 10; t++) e.putBoolean("t" + t, Array.getBoolean(togState, t)); e.apply(); }
-  void loadPrefs() { SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE); int tier = detectGpuTier(); int[] def = {tier == 2 ? 3 : (tier == 1 ? 4 : 5), 1, 0, tier == 2 ? 1 : (tier == 1 ? 2 : 3), 0, 0, 0, 1, 0}; for (int k = 0; k < 9; k++) { int v = p.getInt("o" + k, Array.getInt(def, k)); Array.setInt(optIdx, k, v); String[] row = (String[]) Array.get(optItems, k); TextView tv = (TextView) Array.get(optVal, k); if (tv != null) tv.setText((String) Array.get(row, v) + " ▾"); } boolean[] tdef = {false, false, false, false, false, false, false, false, false, false}; for (int t = 0; t < 10; t++) setIosSwitchVisual(t, p.getBoolean("t" + t, Array.getBoolean(tdef, t)), false); }
+  void savePrefs() { SharedPreferences.Editor e = getSharedPreferences(PREFS, MODE_PRIVATE).edit(); for (int k = 0; k < 10; k++) e.putInt("o" + k, Array.getInt(optIdx, k)); for (int t = 0; t < 12; t++) e.putBoolean("t" + t, Array.getBoolean(togState, t)); e.apply(); }
+  void loadPrefs() { SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE); int tier = detectGpuTier(); int[] def = {tier == 2 ? 3 : (tier == 1 ? 4 : 5), 1, 0, tier == 2 ? 1 : (tier == 1 ? 2 : 3), 0, 0, 0, 1, 0, 1}; for (int k = 0; k < 10; k++) { int v = p.getInt("o" + k, Array.getInt(def, k)); Array.setInt(optIdx, k, v); String[] row = (String[]) Array.get(optItems, k); TextView tv = (TextView) Array.get(optVal, k); if (tv != null) tv.setText((String) Array.get(row, v) + " ▾"); } boolean[] tdef = {false, false, false, false, false, false, false, false, false, false, false, true}; for (int t = 0; t < 12; t++) setIosSwitchVisual(t, p.getBoolean("t" + t, Array.getBoolean(tdef, t)), false); }
   void busy(boolean b, String m) { if (progTxt != null) progTxt.setText(m); }
   void err(String t, String m) { new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle(t).setMessage(m).setPositiveButton("OK", null).show(); }
   void del(File f) { if (f.isDirectory()) { File[] c = f.listFiles(); if (c != null) for (File x : c) del(x); } f.delete(); }
+
+  void openTouchLayoutEditor() {
+    float d = getResources().getDisplayMetrics().density;
+    Dialog dlg = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+    FrameLayout root = new FrameLayout(this); root.setBackgroundColor(0xFF070B14);
+    View grid = new View(this) {
+      final Paint gp = new Paint(Paint.ANTI_ALIAS_FLAG);
+      @Override protected void onDraw(Canvas c) {
+        int w = getWidth(), h = getHeight(); gp.setStyle(Paint.Style.STROKE); gp.setStrokeWidth(d); gp.setColor(0x1894A3B8);
+        for (int x = 0; x < w; x += Math.round(32f*d)) c.drawLine(x, 0, x, h, gp);
+        for (int y = 0; y < h; y += Math.round(32f*d)) c.drawLine(0, y, w, y, gp);
+        int w43 = Math.min(w, Math.round(h * 4f / 3f)); gp.setColor(0x3338BDF8);
+        c.drawRect((w - w43) * 0.5f, 4f*d, (w + w43) * 0.5f, h - 4f*d, gp);
+      }
+    };
+    root.addView(grid, new FrameLayout.LayoutParams(-1, -1));
+    String[] tsc = {"0.85", "1.0", "1.15", "1.30"}; float sc = 1.0f;
+    try { sc = Float.parseFloat((String) Array.get(tsc, Array.getInt(optIdx, 9))); } catch (Throwable ignored) {}
+    FoxhollowActivity.GcTouchView tv = new FoxhollowActivity.GcTouchView(this, getSharedPreferences("fh_touch_cfg", MODE_PRIVATE), Array.getBoolean(togState, 11), sc);
+    tv.editMode = true; root.addView(tv, new FrameLayout.LayoutParams(-1, -1));
+    LinearLayout bar = new LinearLayout(this); bar.setOrientation(LinearLayout.HORIZONTAL); bar.setGravity(Gravity.CENTER_VERTICAL);
+    bar.setBackground(boxBg(0xE60F172A, 0xE60B111E, 99, 1.2f, 0xFF334155)); bar.setPadding(Math.round(10f*d), Math.round(4f*d), Math.round(10f*d), Math.round(4f*d));
+    TextView opBtn = new TextView(this); opBtn.setText("OPACITY " + Math.round(tv.uiAlpha*100f) + "%"); opBtn.setTextColor(0xFFE2E8F0); opBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f); opBtn.setTypeface(Typeface.DEFAULT_BOLD); opBtn.setPadding(Math.round(8f*d), Math.round(4f*d), Math.round(8f*d), Math.round(4f*d));
+    opBtn.setOnClickListener(v -> { tv.cycleAlpha(); opBtn.setText("OPACITY " + Math.round(tv.uiAlpha*100f) + "%"); });
+    TextView rsBtn = new TextView(this); rsBtn.setText("RESET"); rsBtn.setTextColor(0xFFF87171); rsBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f); rsBtn.setTypeface(Typeface.DEFAULT_BOLD); rsBtn.setPadding(Math.round(8f*d), Math.round(4f*d), Math.round(8f*d), Math.round(4f*d));
+    rsBtn.setOnClickListener(v -> { tv.resetLayoutToDefault(); Toast.makeText(this, "Reset to default", Toast.LENGTH_SHORT).show(); });
+    TextView svBtn = new TextView(this); svBtn.setText("SAVE & CLOSE"); svBtn.setTextColor(0xFF34D399); svBtn.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f); svBtn.setTypeface(Typeface.DEFAULT_BOLD); svBtn.setPadding(Math.round(10f*d), Math.round(4f*d), Math.round(8f*d), Math.round(4f*d));
+    svBtn.setOnClickListener(v -> { tv.saveLayout(); Toast.makeText(this, "Custom touch layout saved", Toast.LENGTH_SHORT).show(); dlg.dismiss(); });
+    bar.addView(opBtn); bar.addView(rsBtn); bar.addView(svBtn);
+    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL); lp.topMargin = Math.round(10f*d);
+    root.addView(bar, lp); dlg.setContentView(root); dlg.show();
+  }
 }

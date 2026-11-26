@@ -7,7 +7,7 @@ import android.view.*; import android.widget.*; import java.io.*; import dev.enc
 public class FoxhollowActivity extends BorealisActivity {
   TextView hudView; Handler hudHandler; Choreographer.FrameCallback frameCb;
   long lastFrameNs = 0, secStartNs = 0; int frameCnt = 0, totalFrames = 0; boolean bootCleared = false; float curFps = 0f, curMs = 0f; volatile long cachedKhz = 0; volatile float cachedTemp = 0f; volatile String cachedBat = null; volatile long cachedRamKb = 0L;
-  boolean sFps, sFt, sTemp, sBat, sRam, sCpu, isNarrow; int hudPos = 0, hudSize = 1;
+  boolean sFps, sFt, sTemp, sBat, sRam, sCpu, isNarrow, touchEnabled, touchHaptics; float touchScale = 1.0f; int hudPos = 0, hudSize = 1; GcTouchView touchView; LinearLayout touchBar; TextView touchPill, alphaPill, editPill, resetPill; public static native void nativeSetTouchPad(long p);
 
   @Override protected void onCreate(Bundle savedInstanceState) {
     Intent i = getIntent();
@@ -23,22 +23,22 @@ public class FoxhollowActivity extends BorealisActivity {
       try { hudPos = Integer.parseInt(i.getStringExtra("FOXHOLLOW_STAT_POS")); } catch (Throwable ignored) {}
       try { hudSize = Integer.parseInt(i.getStringExtra("FOXHOLLOW_STAT_SIZE")); } catch (Throwable ignored) {}
     }
-    isNarrow = i != null && "narrow".equals(i.getStringExtra("FOXHOLLOW_SCREEN_STYLE"));
+    isNarrow = i != null && "narrow".equals(i.getStringExtra("FOXHOLLOW_SCREEN_STYLE")); touchEnabled = i != null && "1".equals(i.getStringExtra("FOXHOLLOW_TOUCH_CONTROLS")); touchHaptics = i == null || !"0".equals(i.getStringExtra("FOXHOLLOW_TOUCH_HAPTICS")); try { String sc = i != null ? i.getStringExtra("FOXHOLLOW_TOUCH_SCALE") : null; if (sc != null) touchScale = Float.parseFloat(sc); } catch (Throwable ignored) {}
     super.onCreate(savedInstanceState); try { getWindow().getDecorView().requestUnbufferedDispatch(InputDevice.SOURCE_ANY); } catch (Throwable ignored) {} if (Build.VERSION.SDK_INT >= 24) { try { getWindow().setSustainedPerformanceMode(true); } catch (Throwable ignored) {} }
     if (isNarrow) {
       getWindow().getDecorView().setBackgroundColor(0xFF000000);
       View dv = getWindow().getDecorView(); dv.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or2, ob) -> applyNarrowSurface(dv)); dv.post(() -> applyNarrowSurface(dv));
     }
-    if (sFps || sFt || sTemp || sBat || sRam || sCpu) getWindow().getDecorView().post(() -> { try { setupHudOverlay(); } catch (Throwable ignored) {} });
+    if (sFps || sFt || sTemp || sBat || sRam || sCpu) getWindow().getDecorView().post(() -> { try { setupHudOverlay(); } catch (Throwable ignored) {} }); getWindow().getDecorView().post(() -> { try { setupTouchOverlay(); } catch (Throwable ignored) {} });
   }
   void setupHudOverlay() {
     float d = getResources().getDisplayMetrics().density;
     hudView = new TextView(this); hudView.setTextColor(0xFFF8FAFC); hudView.setTypeface(Typeface.SANS_SERIF, Typeface.BOLD);
-    hudView.setTextSize(TypedValue.COMPLEX_UNIT_SP, hudSize == 0 ? 10.5f : (hudSize == 2 ? 14.5f : 12f));
-    GradientDrawable bg = new GradientDrawable(); bg.setColor(0x78060A12); bg.setCornerRadius(14f * d);
-    hudView.setBackground(bg); hudView.setPadding(Math.round(12f * d), Math.round(5f * d), Math.round(12f * d), Math.round(5f * d));
+    hudView.setIncludeFontPadding(false); hudView.setTextSize(TypedValue.COMPLEX_UNIT_SP, hudSize == 0 ? 9.5f : (hudSize == 2 ? 13f : 11f));
+    GradientDrawable bg = new GradientDrawable(); bg.setColor(0x78060A12); bg.setCornerRadius(9f * d);
+    hudView.setBackground(bg); hudView.setPadding(Math.round(8f * d), Math.round(3f * d), Math.round(8f * d), Math.round(3f * d));
     int grav = hudPos == 1 ? (Gravity.TOP | Gravity.END) : hudPos == 2 ? (Gravity.BOTTOM | Gravity.START) : hudPos == 3 ? (Gravity.BOTTOM | Gravity.END) : (Gravity.TOP | Gravity.START);
-    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, grav); int m = Math.round(14f * d); lp.setMargins(m, m, m, m); addContentView(hudView, lp);
+    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, grav); lp.setMargins(Math.round(4f * d), Math.round(3f * d), Math.round(4f * d), Math.round(3f * d)); addContentView(hudView, lp);
     frameCb = now -> {
       if (lastFrameNs != 0) curMs = (now - lastFrameNs) / 1000000f; lastFrameNs = now; frameCnt++; totalFrames++; if (!bootCleared && totalFrames > 30) { bootCleared = true; try { String cd = getIntent().getStringExtra("FOXHOLLOW_CACHE_DIR"); if (cd != null) new File(cd, "boot_guard.flag").delete(); } catch (Throwable ignored) {} }
       if (secStartNs == 0) secStartNs = now; else if (now - secStartNs >= 1000000000L) { curFps = Math.round((frameCnt * 1000000000f) / (now - secStartNs)); frameCnt = 0; secStartNs = now; }
@@ -109,5 +109,121 @@ public class FoxhollowActivity extends BorealisActivity {
       return;
     }
     if (v instanceof ViewGroup) { ViewGroup vg = (ViewGroup) v; for (int idx = 0; idx < vg.getChildCount(); idx++) applyNarrowSurface(vg.getChildAt(idx)); }
+  }
+
+  
+  void setupTouchOverlay() {
+    float d = getResources().getDisplayMetrics().density; FrameLayout root = findViewById(android.R.id.content); if (root == null) return;
+    touchView = new GcTouchView(this, getSharedPreferences("fh_touch_cfg", MODE_PRIVATE), touchHaptics, touchScale); touchView.setVisibility(touchEnabled ? View.VISIBLE : View.GONE); root.addView(touchView, new FrameLayout.LayoutParams(-1, -1));
+    touchBar = new LinearLayout(this); touchBar.setOrientation(LinearLayout.HORIZONTAL); touchPill = mkP(d); alphaPill = mkP(d); editPill = mkP(d); resetPill = mkP(d);
+    LinearLayout.LayoutParams g = new LinearLayout.LayoutParams(-2, -2); g.leftMargin = Math.round(6f*d); touchBar.addView(touchPill); touchBar.addView(alphaPill, g); touchBar.addView(editPill, g); touchBar.addView(resetPill, g);
+    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.CENTER_HORIZONTAL); lp.topMargin = Math.round(8f*d); // top bar removed
+    touchPill.setOnClickListener(v -> setTouchVis(touchView.getVisibility() != View.VISIBLE));
+    alphaPill.setOnClickListener(v -> { touchView.cycleAlpha(); refreshTopBar(); });
+    editPill.setOnClickListener(v -> { touchView.editMode = !touchView.editMode; if (!touchView.editMode) touchView.saveLayout(); touchView.invalidate(); refreshTopBar(); }); resetPill.setOnClickListener(v -> { touchView.resetLayoutToDefault(); refreshTopBar(); });
+    refreshTopBar();
+  }
+  TextView mkP(float d) { TextView t = new TextView(this); t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9.5f); t.setTypeface(Typeface.DEFAULT_BOLD); t.setPadding(Math.round(9f*d), Math.round(3f*d), Math.round(9f*d), Math.round(3f*d)); return t; }
+  void stP(TextView t, String x, int fg, int st, float d) { if (t==null) return; t.setText(x); t.setTextColor(fg); GradientDrawable b = new GradientDrawable(); b.setColor(0x66080C14); b.setCornerRadius(99f*d); b.setStroke(Math.max(1,Math.round(d)), st); t.setBackground(b); }
+  void refreshTopBar() { if (touchView==null) return; float d = getResources().getDisplayMetrics().density; boolean v = touchView.getVisibility()==View.VISIBLE; stP(touchPill, v?"PAD ON":"PAD", v?0xFF34D399:0xCC94A3B8, v?0x9934D399:0x4494A3B8, d); alphaPill.setVisibility(v?View.VISIBLE:View.GONE); editPill.setVisibility(v?View.VISIBLE:View.GONE); stP(alphaPill, Math.round(touchView.uiAlpha*100f)+"%", 0xFFE2E8F0, 0x5594A3B8, d); stP(editPill, touchView.editMode?"DONE":"EDIT", touchView.editMode?0xFFFACC15:0xCC94A3B8, touchView.editMode?0xAAFACC15:0x4494A3B8, d); resetPill.setVisibility((v && touchView.editMode)?View.VISIBLE:View.GONE); stP(resetPill, "RESET", 0xFFF87171, 0x99F87171, d); }
+  void setTouchVis(boolean v) { if (touchView==null) return; touchView.editMode=false; touchView.setVisibility(v?View.VISIBLE:View.GONE); if (!v) { touchView.resetAll(); try { nativeSetTouchPad(0L); } catch (Throwable ignored) {} } refreshTopBar(); }
+  @Override public boolean dispatchKeyEvent(KeyEvent e) { if (((e.getSource()&InputDevice.SOURCE_GAMEPAD)==InputDevice.SOURCE_GAMEPAD||(e.getSource()&InputDevice.SOURCE_JOYSTICK)==InputDevice.SOURCE_JOYSTICK)&&touchView!=null&&touchView.getVisibility()==View.VISIBLE) setTouchVis(false); return super.dispatchKeyEvent(e); }
+  @Override public boolean dispatchGenericMotionEvent(MotionEvent e) { if ((e.getSource()&InputDevice.SOURCE_JOYSTICK)==InputDevice.SOURCE_JOYSTICK&&touchView!=null&&touchView.getVisibility()==View.VISIBLE&&(Math.abs(e.getAxisValue(MotionEvent.AXIS_X))>0.25f||Math.abs(e.getAxisValue(MotionEvent.AXIS_Y))>0.25f)) setTouchVis(false); return super.dispatchGenericMotionEvent(e); }
+  static final class GcTouchView extends View {
+    final float d; final android.content.SharedPreferences prefs;
+    final Paint fp = new Paint(Paint.ANTI_ALIAS_FLAG), rp = new Paint(Paint.ANTI_ALIAS_FLAG), tp = new Paint(Paint.ANTI_ALIAS_FLAG), gp = new Paint(Paint.ANTI_ALIAS_FLAG);
+    int lPtr = -1, cPtr = -1, dPtr = -1, lastBtns = 0, dragIdx = -1; boolean editMode = false, hapticsOn = true; float uiAlpha = 0.78f, scaleMul = 1f, dragOffX, dragOffY;
+    float lBx, lBy, lCx, lCy, defLx, defLy, lR, cBx, cBy, cCx, cCy, defCx, defCy, cR, dpadX, dpadY, dpadR;
+    final java.util.HashMap<Integer, Integer> pBtn = new java.util.HashMap<>();
+    static final class Btn { final int m, col, kind; final String lbl; float cx, cy, r, w, h, ang; Btn(int m, String l, int c, int k, float a){this.m=m;lbl=l;col=c;kind=k;ang=a;} }
+    final Btn[] bs = { new Btn(0x0100,"A",0xFF10B981,0,0f), new Btn(0x0200,"B",0xFFEF4444,0,0f), new Btn(0x0400,"X",0xFFCBD5E1,1,66f), new Btn(0x0800,"Y",0xFFCBD5E1,1,-24f), new Btn(0x0040,"L",0xFF94A3B8,2,0f), new Btn(0x0020,"R",0xFF94A3B8,2,0f), new Btn(0x0010,"Z",0xFF818CF8,2,0f), new Btn(0x1000,"START",0xFFCBD5E1,2,0f) };
+    GcTouchView(Context c, android.content.SharedPreferences p, boolean hap, float sc) { super(c); prefs = p; hapticsOn = hap; scaleMul = sc; d = c.getResources().getDisplayMetrics().density; uiAlpha = p.getFloat("alpha", 0.78f); tp.setTextAlign(Paint.Align.CENTER); tp.setTypeface(Typeface.DEFAULT_BOLD); gp.setStyle(Paint.Style.STROKE); }
+    void cycleAlpha() { uiAlpha = uiAlpha > 0.90f ? 0.35f : (uiAlpha < 0.45f ? 0.58f : (uiAlpha < 0.68f ? 0.78f : 1.0f)); prefs.edit().putFloat("alpha", uiAlpha).apply(); invalidate(); }
+    void resetAll() { lPtr = cPtr = dPtr = -1; pBtn.clear(); lastBtns = 0; lCx = lBx = defLx; lCy = lBy = defLy; cCx = cBx = defCx; cCy = cBy = defCy; invalidate(); }
+    Btn gb(int i) { return (Btn) java.lang.reflect.Array.get(bs, i); }
+    @Override protected void onSizeChanged(int w, int h, int ow, int oh) {
+      float s = scaleMul; lR = 54f*d*s; defLx = prefs.getFloat("lx", Math.max(lR+24f*d, w*0.125f)); defLy = prefs.getFloat("ly", h - Math.max(lR+28f*d, h*0.26f)); lBx = lCx = defLx; lBy = lCy = defLy;
+      cR = 38f*d*s; defCx = prefs.getFloat("cx", w - Math.max(198f*d, w*0.245f)); defCy = prefs.getFloat("cy", h - Math.max(cR+22f*d, h*0.16f)); cBx = cCx = defCx; cBy = cCy = defCy;
+      dpadR = 42f*d*s; dpadX = prefs.getFloat("dx", Math.max(176f*d, w*0.245f)); dpadY = prefs.getFloat("dy", h - Math.max(dpadR+18f*d, h*0.16f));
+      float ax = prefs.getFloat("ax", w - Math.max(88f*d, w*0.115f)), ay = prefs.getFloat("ay", h - Math.max(98f*d, h*0.26f));
+      Btn bA = gb(0); bA.cx = ax; bA.cy = ay; bA.r = 32f*d*s; Btn bB = gb(1); bB.cx = prefs.getFloat("bx", ax - 54f*d*s); bB.cy = prefs.getFloat("by", ay + 22f*d*s); bB.r = 22f*d*s;
+      Btn bX = gb(2); bX.cx = prefs.getFloat("xx", ax + 48f*d*s); bX.cy = prefs.getFloat("xy", ay - 10f*d*s); bX.w = 48f*d*s; bX.h = 26f*d*s; Btn bY = gb(3); bY.cx = prefs.getFloat("yx", ax - 10f*d*s); bY.cy = prefs.getFloat("yy", ay - 48f*d*s); bY.w = 48f*d*s; bY.h = 26f*d*s;
+      Btn bL = gb(4); bL.cx = prefs.getFloat("lx_b", 58f*d); bL.cy = prefs.getFloat("ly_b", 36f*d); bL.w = 82f*d; bL.h = 34f*d;
+      Btn bR = gb(5); bR.cx = prefs.getFloat("rx_b", w - 58f*d); bR.cy = prefs.getFloat("ry_b", 56f*d); bR.w = 82f*d; bR.h = 34f*d;
+      Btn bZ = gb(6); bZ.cx = prefs.getFloat("zx_b", w - 138f*d); bZ.cy = prefs.getFloat("zy_b", 56f*d); bZ.w = 58f*d; bZ.h = 30f*d;
+      Btn bS = gb(7); bS.cx = prefs.getFloat("sx_b", w * 0.5f); bS.cy = prefs.getFloat("sy_b", h - 26f*d); bS.w = 74f*d; bS.h = 26f*d;
+    }
+    void resetLayoutToDefault() { prefs.edit().remove("lx").remove("ly").remove("cx").remove("cy").remove("dx").remove("dy").remove("ax").remove("ay").remove("bx").remove("by").remove("xx").remove("xy").remove("yx").remove("yy").remove("lx_b").remove("ly_b").remove("rx_b").remove("ry_b").remove("zx_b").remove("zy_b").remove("sx_b").remove("sy_b").apply(); onSizeChanged(getWidth(), getHeight(), getWidth(), getHeight()); invalidate(); } void saveLayout() { Btn bB=gb(1),bX=gb(2),bY=gb(3); prefs.edit().putFloat("bx",bB.cx).putFloat("by",bB.cy).putFloat("xx",bX.cx).putFloat("xy",bX.cy).putFloat("yx",bY.cx).putFloat("yy",bY.cy).apply();
+      Btn bA = gb(0), bL = gb(4), bR = gb(5), bZ = gb(6), bS = gb(7);
+      prefs.edit().putFloat("lx",defLx).putFloat("ly",defLy).putFloat("cx",defCx).putFloat("cy",defCy).putFloat("dx",dpadX).putFloat("dy",dpadY).putFloat("ax",bA.cx).putFloat("ay",bA.cy).putFloat("lx_b",bL.cx).putFloat("ly_b",bL.cy).putFloat("rx_b",bR.cx).putFloat("ry_b",bR.cy).putFloat("zx_b",bZ.cx).putFloat("zy_b",bZ.cy).putFloat("sx_b",bS.cx).putFloat("sy_b",bS.cy).apply();
+    }
+    int hitBtn(float x, float y) { int best = 0; float bd = 1e9f; for (int i = 0; i < 8; i++) { Btn b = gb(i); float rad = b.kind == 0 ? b.r * 1.22f : Math.max(b.w, b.h) * 0.60f; float dist = (float)Math.hypot(x-b.cx, y-b.cy); if (dist <= rad && dist < bd) { bd = dist; best = b.m; } } return best; }
+    int dpadMask(float x, float y) { float dx = x - dpadX, dy = y - dpadY; if (Math.hypot(dx, dy) < dpadR * 0.22f) return 0; int m = 0; if (dx < -dpadR*0.28f) m |= 1; if (dx > dpadR*0.28f) m |= 2; if (dy > dpadR*0.28f) m |= 4; if (dy < -dpadR*0.28f) m |= 8; return m; }
+    @Override public boolean onTouchEvent(MotionEvent e) {
+      int a = e.getActionMasked(), i = e.getActionIndex(), id = e.getPointerId(i); float x = e.getX(i), y = e.getY(i); int w = getWidth(), h = getHeight();
+      if (editMode) { if (a == MotionEvent.ACTION_DOWN) { Btn bA=gb(0),bB=gb(1),bX=gb(2),bY=gb(3),bL=gb(4),bR=gb(5),bZ=gb(6),bS=gb(7); float[] px={defLx,defCx,dpadX,bA.cx,bB.cx,bX.cx,bY.cx,bL.cx,bR.cx,bZ.cx,bS.cx}, py={defLy,defCy,dpadY,bA.cy,bB.cy,bX.cy,bY.cy,bL.cy,bR.cy,bZ.cy,bS.cy}; dragIdx=-1; float bd=64f*d; for(int k=0;k<11;k++){float dist=(float)Math.hypot(x-px[k],y-py[k]);if(dist<bd){bd=dist;dragIdx=k;dragOffX=px[k]-x;dragOffY=py[k]-y;}} } else if (a == MotionEvent.ACTION_MOVE && dragIdx != -1) { float nx=Math.max(28f*d,Math.min(w-28f*d,x+dragOffX)), ny=Math.max(20f*d,Math.min(h-20f*d,y+dragOffY)); if(dragIdx==0){defLx=lBx=lCx=nx;defLy=lBy=lCy=ny;} else if(dragIdx==1){defCx=cBx=cCx=nx;defCy=cBy=cCy=ny;} else if(dragIdx==2){dpadX=nx;dpadY=ny;} else {Btn b=gb(dragIdx-3);b.cx=nx;b.cy=ny;} invalidate(); } else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) dragIdx=-1; return true; } if (false) {
+        if (a == MotionEvent.ACTION_DOWN) {
+          Btn bA=gb(0),bL=gb(4),bR=gb(5),bZ=gb(6),bS=gb(7); float[] px={defLx,defCx,dpadX,bA.cx,bL.cx,bR.cx,bZ.cx,bS.cx}, py={defLy,defCy,dpadY,bA.cy,bL.cy,bR.cy,bZ.cy,bS.cy}; dragIdx=-1; float bd=72f*d;
+          for (int k=0;k<8;k++){float dist=(float)Math.hypot(x-px[k],y-py[k]);if(dist<bd){bd=dist;dragIdx=k;dragOffX=px[k]-x;dragOffY=py[k]-y;}}
+        } else if (a == MotionEvent.ACTION_MOVE && dragIdx != -1) {
+          float nx=Math.max(36f*d,Math.min(w-36f*d,x+dragOffX)), ny=Math.max(24f*d,Math.min(h-24f*d,y+dragOffY));
+          if(dragIdx==0){defLx=lBx=lCx=nx;defLy=lBy=lCy=ny;} else if(dragIdx==1){defCx=cBx=cCx=nx;defCy=cBy=cCy=ny;} else if(dragIdx==2){dpadX=nx;dpadY=ny;}
+          else if(dragIdx==3){Btn bA=gb(0),bB=gb(1),bX=gb(2),bY=gb(3);bA.cx=nx;bA.cy=ny;bB.cx=nx-54f*d;bB.cy=ny+22f*d;bX.cx=nx+48f*d;bX.cy=ny-10f*d;bY.cx=nx-10f*d;bY.cy=ny-48f*d;}
+          else{Btn b=gb(dragIdx);b.cx=nx;b.cy=ny;} invalidate();
+        } else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) dragIdx = -1;
+        return true;
+      }
+      if (a == MotionEvent.ACTION_DOWN || a == MotionEvent.ACTION_POINTER_DOWN) {
+        int hm = hitBtn(x, y);
+        if (hm != 0) pBtn.put(id, hm);
+        else if (dPtr == -1 && Math.hypot(x-dpadX, y-dpadY) <= dpadR*1.25f) { dPtr = id; pBtn.put(id, dpadMask(x, y)); }
+        else if (cPtr == -1 && Math.hypot(x-defCx, y-defCy) <= cR*1.45f) { cPtr = id; cBx = defCx; cBy = defCy; cCx = x; cCy = y; }
+        else if (lPtr == -1 && x < w*0.46f && y > h*0.22f) { lPtr = id; lBx = Math.max(lR+16f*d, Math.min(w*0.36f, x)); lBy = Math.max(h*0.32f, Math.min(h-lR-16f*d, y)); lCx = x; lCy = y; }
+      } else if (a == MotionEvent.ACTION_MOVE) {
+        for (int p = 0; p < e.getPointerCount(); p++) {
+          int pid = e.getPointerId(p); float px = e.getX(p), py = e.getY(p);
+          if (pid == lPtr) { lCx = px; lCy = py; } else if (pid == cPtr) { cCx = px; cCy = py; } else if (pid == dPtr) pBtn.put(pid, dpadMask(px, py));
+          else if (pBtn.containsKey(pid)) { int sh = hitBtn(px, py); if ((sh & 0x0F00) != 0) pBtn.put(pid, sh); }
+        }
+      } else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_POINTER_UP || a == MotionEvent.ACTION_CANCEL) {
+        if (a == MotionEvent.ACTION_CANCEL) { resetAll(); push(); return true; }
+        pBtn.remove(id); if (id == lPtr) { lPtr = -1; lBx = lCx = defLx; lBy = lCy = defLy; } if (id == cPtr) { cPtr = -1; cCx = defCx; cCy = defCy; } if (id == dPtr) dPtr = -1;
+      }
+      push(); invalidate(); return true;
+    }
+    void push() {
+      int b = 0; for (int m : pBtn.values()) b |= m;
+      if (hapticsOn && (b & ~lastBtns) != 0) { try { performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING); } catch (Throwable ignored) {} }
+      lastBtns = b; int sx = 0, sy = 0, cx = 0, cy = 0;
+      if (lPtr != -1) { float dx = lCx-lBx, dy = lCy-lBy, dist = (float)Math.hypot(dx,dy), mr = lR*0.86f; if (dist > mr) { dx=(dx/dist)*mr; dy=(dy/dist)*mr; } if (Math.hypot(dx/mr,-dy/mr) > 0.10f) { sx = Math.round((dx/mr)*100f); sy = Math.round((-dy/mr)*100f); } }
+      if (cPtr != -1) { float dx = cCx-cBx, dy = cCy-cBy, dist = (float)Math.hypot(dx,dy), mr = cR*0.86f; if (dist > mr) { dx=(dx/dist)*mr; dy=(dy/dist)*mr; } if (Math.hypot(dx/mr,-dy/mr) > 0.12f) { cx = Math.round((dx/mr)*100f); cy = Math.round((-dy/mr)*100f); } }
+      long pk = ((long)(b&0xFFFF))|(((long)(sx&0xFF))<<16)|(((long)(sy&0xFF))<<24)|(((long)(cx&0xFF))<<32)|(((long)(cy&0xFF))<<40)|(((long)((b&0x0040)!=0?255:0))<<48)|(((long)((b&0x0020)!=0?255:0))<<56);
+      try { nativeSetTouchPad(pk); } catch (Throwable ignored) {}
+    }
+    int aCol(int rgb, float mul) { return (Math.max(0, Math.min(255, Math.round(255f * uiAlpha * mul))) << 24) | (rgb & 0x00FFFFFF); }
+    void drawOct(Canvas c, float cx, float cy, float r, Paint p) { Path ph = new Path(); for (int k=0;k<8;k++){double a=Math.toRadians(22.5+k*45.0);float px=cx+(float)(Math.cos(a)*r),py=cy+(float)(Math.sin(a)*r);if(k==0)ph.moveTo(px,py);else ph.lineTo(px,py);} ph.close(); c.drawPath(ph,p); }
+    void drawStick(Canvas c, float bx, float by, float kx, float ky, float r, boolean act, int ac, boolean isC) {
+      float dx=kx-bx,dy=ky-by,dist=(float)Math.hypot(dx,dy),mr=r*0.82f; if(dist>mr){kx=bx+(dx/dist)*mr;ky=by+(dy/dist)*mr;}
+      fp.setStyle(Paint.Style.FILL); fp.setColor(aCol(0x070B14, act?0.56f:0.40f)); drawOct(c,bx,by,r,fp);
+      gp.setStrokeWidth((act?2.2f:1.5f)*d); gp.setColor(aCol(act?ac:0x94A3B8, act?0.92f:0.52f)); drawOct(c,bx,by,r,gp);
+      gp.setStrokeWidth(1f*d); gp.setColor(aCol(0xCBD5E1, 0.22f)); c.drawCircle(bx,by,r*0.64f,gp);
+      float kr=r*(isC?0.46f:0.44f); fp.setColor(aCol(0x050810,0.72f)); c.drawCircle(kx,ky+2f*d,kr,fp);
+      fp.setColor(aCol(isC?0xFACC15:(act?0x38BDF8:0x64748B), act?0.78f:0.48f)); c.drawCircle(kx,ky,kr,fp);
+      gp.setStrokeWidth(1.6f*d); gp.setColor(aCol(isC?0xFEF08A:0xF8FAFC, act?0.96f:0.65f)); c.drawCircle(kx,ky,kr,gp);
+      if(isC){tp.setColor(aCol(0x0F172A,0.92f));tp.setTextSize(13f*d);c.drawText("C",kx,ky+4.5f*d,tp);} else {gp.setStrokeWidth(1f*d);gp.setColor(aCol(0xFFFFFF,0.35f));c.drawCircle(kx,ky,kr*0.62f,gp);}
+    }
+    @Override protected void onDraw(Canvas c) {
+      drawStick(c,lBx,lBy,lCx,lCy,lR,lPtr!=-1,0x38BDF8,false); drawStick(c,defCx,defCy,cCx,cCy,cR,cPtr!=-1,0xFACC15,true);
+      float arm=dpadR*0.34f,len=dpadR*0.96f; Path cr=new Path(); cr.moveTo(dpadX-arm,dpadY-len);cr.lineTo(dpadX+arm,dpadY-len);cr.lineTo(dpadX+arm,dpadY-arm);cr.lineTo(dpadX+len,dpadY-arm);cr.lineTo(dpadX+len,dpadY+arm);cr.lineTo(dpadX+arm,dpadY+arm);cr.lineTo(dpadX+arm,dpadY+len);cr.lineTo(dpadX-arm,dpadY+len);cr.lineTo(dpadX-arm,dpadY+arm);cr.lineTo(dpadX-len,dpadY+arm);cr.lineTo(dpadX-len,dpadY-arm);cr.lineTo(dpadX-arm,dpadY-arm);cr.close();
+      fp.setStyle(Paint.Style.FILL);fp.setColor(aCol(0x0A101D,0.62f));c.drawPath(cr,fp);rp.setStyle(Paint.Style.STROKE);rp.setStrokeWidth(1.6f*d);rp.setColor(aCol(0x94A3B8,0.65f));c.drawPath(cr,rp);
+      int[] ms={8,4,1,2};String[] gl={"\u25B2","\u25BC","\u25C4","\u25BA"};float[] gx={dpadX,dpadX,dpadX-dpadR*0.62f,dpadX+dpadR*0.62f},gy={dpadY-dpadR*0.62f,dpadY+dpadR*0.62f,dpadY,dpadY};tp.setTextSize(11f*d);
+      for(int k=0;k<4;k++){boolean dn=(lastBtns&ms[k])!=0;tp.setColor(aCol(dn?0x38BDF8:0xCBD5E1,dn?1f:0.65f));c.drawText(gl[k],gx[k],gy[k]+4f*d,tp);}
+      for(int i=0;i<8;i++){Btn b=gb(i);boolean dn=(lastBtns&b.m)!=0;fp.setStyle(Paint.Style.FILL);fp.setColor(aCol(dn?b.col:0x0B111E,dn?0.72f:0.56f));rp.setStyle(Paint.Style.STROKE);rp.setStrokeWidth((dn?2.4f:1.6f)*d);rp.setColor(aCol(b.col,dn?1f:0.72f));tp.setColor(aCol(dn?0xFFFFFF:b.col,dn?1f:0.92f));
+        if(b.kind==0){c.drawCircle(b.cx,b.cy,b.r,fp);c.drawCircle(b.cx,b.cy,b.r,rp);gp.setStrokeWidth(1f*d);gp.setColor(aCol(0xFFFFFF,0.18f));c.drawCircle(b.cx,b.cy,b.r-3f*d,gp);tp.setTextSize((i==0?20f:15f)*d);c.drawText(b.lbl,b.cx,b.cy+(i==0?7f:5.5f)*d,tp);}
+        else if(b.kind==1){c.save();c.rotate(b.ang,b.cx,b.cy);RectF rf=new RectF(b.cx-b.w*0.5f,b.cy-b.h*0.5f,b.cx+b.w*0.5f,b.cy+b.h*0.5f);c.drawRoundRect(rf,b.h*0.5f,b.h*0.5f,fp);c.drawRoundRect(rf,b.h*0.5f,b.h*0.5f,rp);c.rotate(-b.ang,b.cx,b.cy);tp.setTextSize(14f*d);c.drawText(b.lbl,b.cx,b.cy+5f*d,tp);c.restore();}
+        else{RectF rf=new RectF(b.cx-b.w*0.5f,b.cy-b.h*0.5f,b.cx+b.w*0.5f,b.cy+b.h*0.5f);c.drawRoundRect(rf,b.h*0.5f,b.h*0.5f,fp);c.drawRoundRect(rf,b.h*0.5f,b.h*0.5f,rp);tp.setTextSize(11.5f*d);c.drawText(b.lbl,b.cx,b.cy+4f*d,tp);}
+      }
+      if(editMode){tp.setColor(0xFFFACC15);tp.setTextSize(13f*d);c.drawText("DRAG ANY CONTROL \u2022 TAP DONE WHEN FINISHED",getWidth()*0.5f,getHeight()*0.48f,tp);}
+    }
   }
 }

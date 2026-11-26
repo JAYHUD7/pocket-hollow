@@ -723,15 +723,50 @@ void after_present() noexcept {
   }
   std::lock_guard lock{g_presentStatsMutex};
   g_presentTimes.push_back(now);
-  {
+    {
     static std::atomic<uint32_t> s_fhFrames{0};
     static std::atomic<uint32_t> s_fhLastUs{0};
     static PresentClock::time_point s_fhPrev{};
-    if (s_fhPrev.time_since_epoch().count() > 0) {
-      auto us = std::chrono::duration_cast<std::chrono::microseconds>(now - s_fhPrev).count();
-      if (us > 0 && us < 2000000) s_fhLastUs.store(static_cast<uint32_t>(us), std::memory_order_relaxed);
+    static PresentClock::time_point s_fhTarget{};
+
+    static int s_limit = -1;
+    if (s_limit < 0) {
+      const char* envLim = std::getenv("FOXHOLLOW_FRAME_LIMIT");
+      s_limit = (envLim && envLim[0]) ? std::atoi(envLim) : 60;
+      if (s_limit < 0) s_limit = 60;
     }
-    s_fhPrev = now;
+
+    auto cur = PresentClock::now();
+    if (s_limit > 0) {
+      const auto period = std::chrono::nanoseconds(1000000000LL / s_limit);
+      if (s_fhTarget.time_since_epoch().count() == 0 || cur >= s_fhTarget + period) {
+        // Real slowdown or first frame: do NOT stall, re-anchor cleanly
+        s_fhTarget = cur + period;
+      } else {
+        const auto deadline = s_fhTarget;
+        s_fhTarget += period;
+        while (PresentClock::now() < deadline) {
+          const auto rem = deadline - PresentClock::now();
+          if (rem > std::chrono::microseconds(1500)) {
+            struct timespec ts{0, 1000000L}; // 1ms sleep via nanosleep
+            nanosleep(&ts, nullptr);
+          } else {
+#if defined(__aarch64__)
+            __asm__ __volatile__("yield" ::: "memory");
+#endif
+          }
+        }
+        cur = PresentClock::now();
+      }
+    }
+
+    if (s_fhPrev.time_since_epoch().count() > 0) {
+      auto us = std::chrono::duration_cast<std::chrono::microseconds>(cur - s_fhPrev).count();
+      if (us > 0 && us < 2000000) {
+        s_fhLastUs.store(static_cast<uint32_t>(us), std::memory_order_relaxed);
+      }
+    }
+    s_fhPrev = cur;
     s_fhFrames.fetch_add(1u, std::memory_order_relaxed);
     extern uint32_t* fh_aurora_frames_ptr();
     extern uint32_t* fh_aurora_us_ptr();

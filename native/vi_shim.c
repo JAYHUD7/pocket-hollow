@@ -147,6 +147,12 @@ void fhAdpfBoostMapLoad(void) {
   }
 }
 
+#include <stdatomic.h>
+static _Atomic uint32_t gFhPresentedFrames = 0;
+static _Atomic uint32_t gFhLastFrameUs = 0;
+static int64_t sPrevPresentNs = 0;
+uint32_t fhGetPresentedFrames(void) { return atomic_load_explicit(&gFhPresentedFrames, memory_order_relaxed); }
+static _Atomic uint32_t gFhFrameCount = 0; uint32_t fhGetLastFrameUs(void) { return atomic_load_explicit(&gFhLastFrameUs, memory_order_relaxed); }
 void foxhollowFramePumpInit(void) {
   pump_events();
   sFrameOpen = aurora_begin_frame();
@@ -164,7 +170,7 @@ void VIWaitForRetrace(void) {
       fhDrawBlackScreen();
     }
     fhGXCompleteFrame();
-    aurora_end_frame();
+    aurora_end_frame(); atomic_fetch_add_explicit(&gFhFrameCount, 1u, memory_order_relaxed);
     fhAdpfReportFrameWork();
 #if defined(FOXHOLLOW_DEBUG_INPUT_TIMING)
     fhDebugOverlayFramePresented();
@@ -207,9 +213,25 @@ VIRetraceCallback VISetPostRetraceCallback(VIRetraceCallback cb) {
   return prev;
 }
 
-void VISetNextFrameBuffer(void* fb) { sNextFrameBuffer = fb; }
+void VISetNextFrameBuffer(void* fb) {
+  sNextFrameBuffer = fb;
+  int64_t nowNs = fhNowNs();
+  if (sPrevPresentNs > 0) {
+    int64_t dtUs = (nowNs - sPrevPresentNs) / 1000LL;
+    if (dtUs > 0 && dtUs < 2000000LL) {
+      atomic_store_explicit(&gFhLastFrameUs, (uint32_t)dtUs, memory_order_relaxed);
+    }
+  }
+  sPrevPresentNs = nowNs;
+  atomic_fetch_add_explicit(&gFhPresentedFrames, 1u, memory_order_relaxed);
+}
 void* VIGetNextFrameBuffer(void) { return sNextFrameBuffer; }
 void VISetBlack(BOOL black) { sBlack = black ? 1 : 0; }
 u32 VIGetRetraceCount(void) { return sRetraceCount; }
 u32 VIGetNextField(void) { return 0; }
 u32 VIGetDTVStatus(void) { return 1; }
+
+#if defined(__ANDROID__)
+#include <jni.h>
+
+#endif

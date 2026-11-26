@@ -233,7 +233,7 @@ public class LauncherActivity extends Activity {
       boolean sel = (idx == Array.getInt(optIdx, k)); item.setTextColor(sel ? 0xFFFACC15 : 0xFFF1F5F9); item.setTypeface(sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
       item.setTextSize(TypedValue.COMPLEX_UNIT_PX, spx(12)); item.setPadding(spx(14), spx(8), spx(18), spx(8)); prep(item);
       item.setBackground(focusBg(sel ? 0xFF1E293B : 0xFF141C2B, 0xFF182236, 8, 0, 0xFFF59E0B));
-      item.setOnClickListener(v -> { Array.setInt(optIdx, k, idx); anchor.setText(lbl + " â–¾"); savePrefs(); pop.dismiss(); if (k == 1) { buildUi(); return; } refresh(); });
+      item.setOnClickListener(v -> { Array.setInt(optIdx, k, idx); anchor.setText(lbl + " \u25BE"); savePrefs(); pop.dismiss(); if (k == 1) { buildUi(); return; } refresh(); });
       menu.addView(item); if (sel) item.post(item::requestFocus);
     }
     menu.measure(View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
@@ -366,7 +366,7 @@ public class LauncherActivity extends Activity {
           if (so == null) throw new IOException("No .so Vulkan driver found");
           try (FileWriter fw = new FileWriter(new File(dd, "vk_icd.json"))) { fw.write("{\"file_format_version\":\"1.0.0\",\"ICD\":{\"library_path\":\"./" + so + "\",\"api_version\":\"1.3.0\"}}"); }
           final String fSo = so;
-          runOnUiThread(() -> { getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("driver_name", fSo).apply(); Array.setInt(optIdx, 8, 5); TextView dv = (TextView) Array.get(optVal, 8); if (dv != null) dv.setText("Custom (.zip) â–¾"); savePrefs(); busy(false, "Ready for Launch"); refresh(); });
+          runOnUiThread(() -> { getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("driver_name", fSo).apply(); Array.setInt(optIdx, 8, 5); TextView dv = (TextView) Array.get(optVal, 8); if (dv != null) dv.setText("Custom (.zip) \u25BE"); savePrefs(); busy(false, "Ready for Launch"); refresh(); });
         } catch (Exception ex) { final String em = String.valueOf(ex.getMessage()); runOnUiThread(() -> { busy(false, "Ready for Launch"); err("Driver Import Failed", em); }); }
       }).start();
     }
@@ -576,7 +576,7 @@ public class LauncherActivity extends Activity {
     }).start();
   }
   void savePrefs() { SharedPreferences.Editor e = getSharedPreferences(PREFS, MODE_PRIVATE).edit(); for (int k = 0; k < 10; k++) e.putInt("o" + k, Array.getInt(optIdx, k)); for (int t = 0; t < 13; t++) e.putBoolean("t" + t, Array.getBoolean(togState, t)); e.apply(); }
-  void loadPrefs() { SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE); int tier = detectGpuTier(); int[] def = {tier == 2 ? 3 : (tier == 1 ? 4 : 5), 1, 0, tier == 2 ? 1 : (tier == 1 ? 2 : 3), 0, 0, 0, 1, 0, 1}; for (int k = 0; k < 10; k++) { int v = p.getInt("o" + k, Array.getInt(def, k)); Array.setInt(optIdx, k, v); String[] row = (String[]) Array.get(optItems, k); TextView tv = (TextView) Array.get(optVal, k); if (tv != null) tv.setText((String) Array.get(row, v) + " â–¾"); } boolean[] tdef = {false, false, false, false, false, false, false, false, false, false, false, true, false}; for (int t = 0; t < 13; t++) setIosSwitchVisual(t, p.getBoolean("t" + t, Array.getBoolean(tdef, t)), false); }
+  void loadPrefs() { SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE); int tier = detectGpuTier(); int[] def = {tier == 2 ? 3 : (tier == 1 ? 4 : 5), 1, 0, tier == 2 ? 1 : (tier == 1 ? 2 : 3), 0, 0, 0, 1, 0, 1}; for (int k = 0; k < 10; k++) { int v = p.getInt("o" + k, Array.getInt(def, k)); Array.setInt(optIdx, k, v); String[] row = (String[]) Array.get(optItems, k); TextView tv = (TextView) Array.get(optVal, k); if (tv != null) tv.setText((String) Array.get(row, v) + " \u25BE"); } boolean[] tdef = {false, false, false, false, false, false, false, false, false, false, false, true, false}; for (int t = 0; t < 13; t++) setIosSwitchVisual(t, p.getBoolean("t" + t, Array.getBoolean(tdef, t)), false); }
   void busy(boolean b, String m) { if (progTxt != null) progTxt.setText(m); }
   void err(String t, String m) { new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle(t).setMessage(m).setPositiveButton("OK", null).show(); }
   void del(File f) { if (f.isDirectory()) { File[] c = f.listFiles(); if (c != null) for (File x : c) del(x); } f.delete(); }

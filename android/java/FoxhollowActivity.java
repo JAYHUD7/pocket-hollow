@@ -4,7 +4,7 @@ import android.graphics.drawable.GradientDrawable; import android.os.*; import a
 import android.text.*; import android.text.style.ForegroundColorSpan; import android.util.TypedValue;
 import android.view.*; import android.widget.*; import java.io.*; import dev.encounter.borealis.BorealisActivity;
 
-public class FoxhollowActivity extends BorealisActivity {
+public class FoxhollowActivity extends BorealisActivity { public static native long nativeGetFrameStats(); int lastNativeFrames = -1; long lastStatNs = 0;
   TextView hudView; Handler hudHandler; Choreographer.FrameCallback frameCb;
   long lastFrameNs = 0, secStartNs = 0; int frameCnt = 0, totalFrames = 0; boolean bootCleared = false; float curFps = 0f, curMs = 0f; volatile long cachedKhz = 0; volatile float cachedTemp = 0f; volatile String cachedBat = null; volatile long cachedRamKb = 0L;
   boolean sFps, sFt, sTemp, sBat, sRam, sCpu, isNarrow, touchEnabled, touchHaptics, touchHybrid; float touchScale = 1.0f; int hudPos = 0, hudSize = 1; GcTouchView touchView; LinearLayout touchBar; TextView touchPill, alphaPill, editPill, resetPill; public static native void nativeSetTouchPad(long p); public static native void nativeSetPhysPad(int m, int en); int physMask = 0; boolean physCustom = false; final int[] kcMap = new int[]{96,97,99,100,102,103,105,108,19,20,21,22}; final int[] gcBits = new int[]{0x0100,0x0200,0x0400,0x0800,0x0040,0x0020,0x0010,0x1000,0x0008,0x0004,0x0001,0x0002};
@@ -39,14 +39,11 @@ public class FoxhollowActivity extends BorealisActivity {
     hudView.setBackground(bg); hudView.setPadding(Math.round(8f * d), Math.round(3f * d), Math.round(8f * d), Math.round(3f * d));
     int grav = hudPos == 1 ? (Gravity.TOP | Gravity.END) : hudPos == 2 ? (Gravity.BOTTOM | Gravity.START) : hudPos == 3 ? (Gravity.BOTTOM | Gravity.END) : (Gravity.TOP | Gravity.START);
     FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, grav); lp.setMargins(Math.round(4f * d), Math.round(3f * d), Math.round(4f * d), Math.round(3f * d)); addContentView(hudView, lp);
-    frameCb = now -> {
-      if (lastFrameNs != 0) curMs = (now - lastFrameNs) / 1000000f; lastFrameNs = now; frameCnt++; totalFrames++; if (!bootCleared && totalFrames > 30) { bootCleared = true; try { String cd = getIntent().getStringExtra("FOXHOLLOW_CACHE_DIR"); if (cd != null) new File(cd, "boot_guard.flag").delete(); } catch (Throwable ignored) {} }
-      if (secStartNs == 0) secStartNs = now; else if (now - secStartNs >= 1000000000L) { curFps = Math.round((frameCnt * 1000000000f) / (now - secStartNs)); frameCnt = 0; secStartNs = now; }
-      if (hudView != null && hudView.getVisibility() == View.VISIBLE) Choreographer.getInstance().postFrameCallback(frameCb);
-    };
-    Choreographer.getInstance().postFrameCallback(frameCb);
     Thread statBg = new Thread(() -> { while (!isFinishing()) { try { if (sCpu) cachedKhz = readMaxCpuKhz(); if (sTemp) cachedTemp = readTempC(); if (sBat) cachedBat = readBatteryStr(); if (sRam) cachedRamKb = readGameRamKb(); Thread.sleep(1000); } catch (Throwable ignored) {} } }); statBg.setDaemon(true); statBg.start(); hudHandler = new Handler(Looper.getMainLooper());
-    hudHandler.post(new Runnable() { @Override public void run() { if (hudView != null) { hudView.setText(buildTelemetryPill()); hudHandler.postDelayed(this, 500); } } });
+    hudHandler.post(new Runnable() { @Override public void run() {
+      try { long st = nativeGetFrameStats(); int f = (int)(st >>> 32); int us = (int)(st & 0xFFFFFFFFL); long now = System.nanoTime(); if (lastNativeFrames >= 0 && lastStatNs > 0) { float dt = (now - lastStatNs) / 1000000000f; if (dt > 0.05f) curFps = Math.max(0f, (f - lastNativeFrames) / dt); } lastNativeFrames = f; lastStatNs = now; if (us > 0) curMs = us / 1000f; else if (curFps > 0.5f) curMs = 1000f / curFps; if (!bootCleared && f > 30) { bootCleared = true; String cd = getIntent().getStringExtra("FOXHOLLOW_CACHE_DIR"); if (cd != null) new File(cd, "boot_guard.flag").delete(); } } catch (Throwable ignored) {}
+      if (hudView != null) { hudView.setText(buildTelemetryPill()); hudHandler.postDelayed(this, 500); }
+    } });
   }
   void addSeg(SpannableStringBuilder sb, String lbl, String val, int valCol) {
     if (sb.length() > 0) { int s0 = sb.length(); sb.append("  \u2022  "); sb.setSpan(new ForegroundColorSpan(0xFF475569), s0, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE); }

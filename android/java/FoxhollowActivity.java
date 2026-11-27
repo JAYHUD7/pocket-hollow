@@ -29,7 +29,22 @@ public class FoxhollowActivity extends BorealisActivity { public static native l
       getWindow().getDecorView().setBackgroundColor(0xFF000000);
       View dv = getWindow().getDecorView(); dv.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or2, ob) -> applyNarrowSurface(dv)); dv.post(() -> applyNarrowSurface(dv));
     }
-    if (sFps || sFt || sTemp || sBat || sRam || sCpu) getWindow().getDecorView().post(() -> { try { setupHudOverlay(); } catch (Throwable ignored) {} }); getWindow().getDecorView().post(() -> { try { setupTouchOverlay(); } catch (Throwable ignored) {} });
+    getWindow().getDecorView().post(() -> { try { startBootGuardWatchdog(); } catch (Throwable ignored) {} }); if (sFps || sFt || sTemp || sBat || sRam || sCpu) getWindow().getDecorView().post(() -> { try { setupHudOverlay(); } catch (Throwable ignored) {} }); getWindow().getDecorView().post(() -> { try { setupTouchOverlay(); } catch (Throwable ignored) {} });
+  }
+  void startBootGuardWatchdog() {
+    final Handler bgH = new Handler(Looper.getMainLooper());
+    bgH.postDelayed(new Runnable() { @Override public void run() {
+      try {
+        int f = (int)(nativeGetFrameStats() >>> 32);
+        if (!bootCleared && f > 30) {
+          bootCleared = true;
+          String cd = getIntent().getStringExtra("FOXHOLLOW_CACHE_DIR");
+          if (cd != null) { new File(cd, "boot_guard.flag").delete(); new File(cd, "boot_guard_vk.flag").delete(); }
+          return;
+        }
+      } catch (Throwable ignored) {}
+      if (!isFinishing() && !bootCleared) bgH.postDelayed(this, 500);
+    } }, 500);
   }
   void setupHudOverlay() {
     float d = getResources().getDisplayMetrics().density;

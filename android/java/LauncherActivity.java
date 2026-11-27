@@ -311,8 +311,25 @@ public class LauncherActivity extends Activity {
   File prepareActiveDriver() throws Exception {
     int dMode = Array.getInt(optIdx, 8); if (dMode == 4) return null;
     SharedPreferences sp = getSharedPreferences(PREFS, MODE_PRIVATE);
-    File bg = new File(new File(baseDir, "cache"), "boot_guard.flag");
-    if (dMode == 0 && bg.exists()) { bg.delete(); sp.edit().putBoolean("auto_force_sys", true).apply(); }
+    File cacheDir = new File(baseDir, "cache");
+    File bg = new File(cacheDir, "boot_guard.flag");
+    File bgVk = new File(cacheDir, "boot_guard_vk.flag");
+    if (bg.exists()) {
+      bg.delete();
+      if (dMode == 0 && !sp.getBoolean("auto_force_sys", false) && resolveAutoDriverAsset() != null) {
+        sp.edit().putBoolean("auto_force_sys", true).apply();
+      } else if (Array.getInt(optIdx, 4) == 0) {
+        sp.edit().putBoolean("auto_force_gles", true).putInt("o4", 1).apply();
+        Array.setInt(optIdx, 4, 1);
+      }
+    }
+    if (bgVk.exists()) {
+      bgVk.delete();
+      if (Array.getInt(optIdx, 4) == 0) {
+        sp.edit().putBoolean("auto_force_gles", true).putInt("o4", 1).apply();
+        Array.setInt(optIdx, 4, 1);
+      }
+    }
     if (dMode == 0 && sp.getBoolean("auto_force_sys", false)) return null;
     if (dMode == 5) { File icd = new File(new File(getCodeCacheDir(), "custom_driver"), "vk_icd.json"); return icd.exists() ? icd : null; }
     String ap = dMode == 0 ? resolveAutoDriverAsset() : (dMode == 1 ? "drivers/turnip_ci.zip" : (dMode == 2 ? "drivers/turnip_a8xx.zip" : "drivers/qualcomm_adreno.zip"));
@@ -336,6 +353,7 @@ public class LauncherActivity extends Activity {
     super.onActivityResult(req, res, d);
     if (res != RESULT_OK || d == null || d.getData() == null) return;
     final Uri u = d.getData();
+    try { getContentResolver().takePersistableUriPermission(u, Intent.FLAG_GRANT_READ_URI_PERMISSION); } catch (Throwable ignored) {}
     if (req == REQ_ISO) {
       busy(true, "Importing legal disc..."); setProgPermille(10);
       new Thread(() -> {
@@ -345,6 +363,22 @@ public class LauncherActivity extends Activity {
           try (InputStream in = getContentResolver().openInputStream(u); OutputStream out = new FileOutputStream(tmp)) {
             byte[] b = (byte[]) Array.newInstance(byte.class, 65536); int n; long cp = 0; int lm = -1;
             while ((n = in.read(b)) > 0) { out.write(b, 0, n); cp += n; int pm = tot > 0 ? (int)Math.min(990L, (cp*1000L)/tot) : 500; if (pm >= lm + 15) { lm = pm; setProgPermille(pm); } }
+          }
+          try (RandomAccessFile raf = new RandomAccessFile(tmp, "r")) {
+            if (raf.length() >= 32) {
+              byte[] hdr = new byte[32];
+              raf.readFully(hdr);
+              int magic = ((hdr[28] & 0xFF) << 24) | ((hdr[29] & 0xFF) << 16) | ((hdr[30] & 0xFF) << 8) | (hdr[31] & 0xFF);
+              if (magic == 0xC2339F3D) {
+                String gid = new String(hdr, 0, 6, "US-ASCII");
+                if (!gid.startsWith("GSAE")) {
+                  tmp.delete();
+                  final String badId = gid;
+                  runOnUiThread(() -> { busy(false, "Ready for Launch"); err("Unsupported ISO Region (" + badId + ")", "Pocket-Hollow requires an unmodified USA (GSAE01) ISO. Europe PAL (GSAP01) and Japan (GSAJ01) ISOs are not supported."); });
+                  return;
+                }
+              }
+            }
           }
           if (dst.exists()) dst.delete(); if (!tmp.renameTo(dst)) throw new IOException("Cannot finalize game.iso");
           runOnUiThread(() -> { setProgPermille(1000); busy(false, "Ready for Launch"); refresh(); });
@@ -530,7 +564,7 @@ public class LauncherActivity extends Activity {
       String body = "**Device:** " + Build.MANUFACTURER + " " + Build.MODEL + "\n"
           + "**Android:** " + Build.VERSION.RELEASE + " (SDK " + Build.VERSION.SDK_INT + ")\n"
           + "**GPU:** " + detectGpuRenderer() + "\n"
-          + "**App Version:** v1.2.2\n"
+          + "**App Version:** v1.4\n"
           + "**Driver Mode:** " + (String) Array.get(dm, Math.min(5, Array.getInt(optIdx, 8))) + "\n"
           + "**Resolution Scale:** " + (String) Array.get(sc, Math.min(5, Array.getInt(optIdx, 0))) + "\n"
           + "**HD Textures:** " + (Array.getBoolean(togState, 0) ? "ON" : "OFF") + "\n\n"
@@ -571,12 +605,18 @@ public class LauncherActivity extends Activity {
         i.putExtra("FOXHOLLOW_LANGUAGE", (String) Array.get(lg, Array.getInt(optIdx, 5))); i.putExtra("FOXHOLLOW_DEBUG", "0");
         File icd = null; try { icd = prepareActiveDriver(); } catch (Throwable ignored) {}
         if (icd != null && icd.exists()) { i.putExtra("CUSTOM_VK_ICD", icd.getAbsolutePath()); i.putExtra("CUSTOM_VK_DIR", icd.getParentFile().getAbsolutePath()); }
-        if (Array.getInt(optIdx, 8) == 0) { try (FileWriter fw = new FileWriter(new File(new File(baseDir, "cache"), "boot_guard.flag"))) { fw.write("1"); } catch (Throwable ignored) {} } startActivity(i);
+        try {
+          File cDir = new File(baseDir, "cache"); cDir.mkdirs();
+          String guardName = (Array.getInt(optIdx, 4) == 0) ? "boot_guard_vk.flag" : "boot_guard.flag";
+          try (FileWriter fw = new FileWriter(new File(cDir, guardName))) { fw.write("1"); }
+        } catch (Throwable ignored) {}
+        i.putExtra("FOXHOLLOW_RENDERER", Array.getInt(optIdx, 4) == 0 ? "vulkan" : "opengles");
+        startActivity(i);
       });
     }).start();
   }
   void savePrefs() { SharedPreferences.Editor e = getSharedPreferences(PREFS, MODE_PRIVATE).edit(); for (int k = 0; k < 10; k++) e.putInt("o" + k, Array.getInt(optIdx, k)); for (int t = 0; t < 13; t++) e.putBoolean("t" + t, Array.getBoolean(togState, t)); e.apply(); }
-  void loadPrefs() { SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE); int tier = detectGpuTier(); int[] def = {tier == 2 ? 3 : (tier == 1 ? 4 : 5), 1, 0, tier == 2 ? 1 : (tier == 1 ? 2 : 3), 0, 0, 0, 1, 0, 1}; for (int k = 0; k < 10; k++) { int v = p.getInt("o" + k, Array.getInt(def, k)); Array.setInt(optIdx, k, v); String[] row = (String[]) Array.get(optItems, k); TextView tv = (TextView) Array.get(optVal, k); if (tv != null) tv.setText((String) Array.get(row, v) + " \u25BE"); } boolean[] tdef = {false, false, false, false, false, false, false, false, false, false, false, true, false}; for (int t = 0; t < 13; t++) setIosSwitchVisual(t, p.getBoolean("t" + t, Array.getBoolean(tdef, t)), false); }
+  void loadPrefs() { SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE); int tier = detectGpuTier(); String gLow = detectGpuRenderer().toLowerCase(); boolean isA8xx = gLow.contains("adreno") && (gLow.contains("830") || gLow.contains("840") || gLow.contains(" 8")); int defApi = (isA8xx || p.getBoolean("auto_force_gles", false)) ? 1 : 0; int[] def = {tier == 2 ? 3 : (tier == 1 ? 4 : 5), 1, 0, tier == 2 ? 1 : (tier == 1 ? 2 : 3), defApi, 0, 0, 1, 0, 1}; for (int k = 0; k < 10; k++) { int v = p.getInt("o" + k, Array.getInt(def, k)); Array.setInt(optIdx, k, v); String[] row = (String[]) Array.get(optItems, k); TextView tv = (TextView) Array.get(optVal, k); if (tv != null) tv.setText((String) Array.get(row, v) + " \u25BE"); } boolean[] tdef = {false, false, false, false, false, false, false, false, false, false, false, true, false}; for (int t = 0; t < 13; t++) setIosSwitchVisual(t, p.getBoolean("t" + t, Array.getBoolean(tdef, t)), false); }
   void busy(boolean b, String m) { if (progTxt != null) progTxt.setText(m); }
   void err(String t, String m) { new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert).setTitle(t).setMessage(m).setPositiveButton("OK", null).show(); }
   void del(File f) { if (f.isDirectory()) { File[] c = f.listFiles(); if (c != null) for (File x : c) del(x); } f.delete(); }
